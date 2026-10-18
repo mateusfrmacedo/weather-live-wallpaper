@@ -24,7 +24,21 @@ Esta versão foi desenvolvida e verificada em:
 
 O projeto usa APIs privadas e uma ponte de ABI Swift específica do ambiente acima. Outras versões do macOS podem exigir adaptações. Não há suporte verificado para Intel.
 
-## Compilar e instalar
+## Baixar e instalar
+
+**[Baixar a versão mais recente para macOS](https://github.com/mateusfrmacedo/weather-live-wallpaper/releases/latest)**
+
+1. Baixe o arquivo `.dmg` na seção **Assets** da versão.
+2. Abra o `.dmg` e arraste **Weather Wallpaper.app** para **Applications**.
+3. Abra o app, escolha uma cidade e clique em **Usar como wallpaper**.
+
+Também está disponível um `.zip`: descompacte e copie o aplicativo para a pasta Aplicativos. Não é necessário instalar Xcode para usar o download pronto.
+
+O download é para **Apple Silicon e macOS 27**, verificado no macOS 27.0.1 (26A434). A compatibilidade com outras versões depende dos componentes privados do sistema.
+
+O aplicativo tem assinatura **ad hoc**, sem notarização da Apple. Se o macOS bloquear a primeira abertura, tente abrir o app e depois acesse **Ajustes do Sistema → Privacidade e Segurança → Abrir Mesmo Assim**. Confirme apenas se o arquivo veio deste repositório. Os hashes para conferir a integridade estão em `SHA256SUMS.txt` na mesma versão.
+
+## Compilar e instalar pelo código-fonte
 
 ```sh
 git clone https://github.com/mateusfrmacedo/weather-live-wallpaper.git
@@ -43,6 +57,14 @@ open "Build/Weather Wallpaper.app"
 ```
 
 Não são necessários pacotes externos, chave WeatherKit ou instalação do REA para compilar o aplicativo.
+
+Para gerar os pacotes de distribuição `.dmg`, `.zip` e os hashes SHA-256:
+
+```sh
+./Scripts/package.sh
+```
+
+Os arquivos são criados em `Build/Release/<versão>/`.
 
 ## Usar
 
