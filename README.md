@@ -1,4 +1,6 @@
 # Weather Live Wallpaper
+<img width="1292" height="857" alt="Captura de Tela 2026-10-18 às 19 33 09" src="https://github.com/user-attachments/assets/c366d8bc-5e86-424d-9cf3-e06ecc281f72" />
+
 
 An animated macOS wallpaper that follows the weather in your city, using the built-in Weather app’s renderer. Weather data comes from [Open-Meteo](https://open-meteo.com/).
 
