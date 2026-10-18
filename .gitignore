@@ -1,0 +1,13 @@
+# Local build products and installed investigation tools
+Build/
+Tools/
+Research/
+
+# macOS and editor metadata
+.DS_Store
+*.xcuserstate
+xcuserdata/
+
+# Generated binaries and symbol bundles
+*.o
+*.dSYM/
