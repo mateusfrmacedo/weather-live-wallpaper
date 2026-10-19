@@ -135,6 +135,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  [previousView setRendersContinuously:NO];[previousScene stopRuntimeThread];[previousScene setIsPlaying:NO];
  [previousView setScene:nil];[previousView removeFromSuperview];
  [self.view insertSubview:self.weatherView atIndex:0];
+ [self.view.layer insertSublayer:self.skyGradient atIndex:0];
  [self.scene setPaused:self.paused];[self.scene setIsPlaying:!self.paused];
  [self.weatherView setRendersContinuously:!self.paused];
  if(self.wallpaper)[self.weatherView _allowGPUBackgroundExecution];

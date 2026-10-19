@@ -27,6 +27,7 @@
  self.liveWeather=@{@"condition":self.condition,@"elevation":@((index%3)==0 ? 35 : (index%3)==1 ? 1 : -25),@"cloudCover":@0.45,@"wind":@12,@"isPM":@(index%2),@"timeZone":@"America/Sao_Paulo",@"date":@(1792360800+(index%24)*3600)};
  if(index%20==0)self.view.bounds=CGRectMake(0,0,index%40 ? 1200 : 900,index%40 ? 700 : 850);
  [self applyWeather];
+ if(self.view.layer.sublayers.firstObject!=self.skyGradient){NSLog(@"FAIL: gradient covers the renderer");exit(1);}
  if(index%50==0){[self togglePause];[self togglePause];NSLog(@"Live render updates: %ld",(long)index);}
  if(self.testUpdates>=200){
   [self.testTimer invalidate];self.condition=@"rain";NSMutableDictionary *weather=[self.liveWeather mutableCopy];weather[@"elevation"]=@35;weather[@"cloudCover"]=@0.95;self.liveWeather=weather;[self applyWeather];
