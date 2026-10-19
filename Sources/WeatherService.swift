@@ -49,28 +49,36 @@ import Foundation
    if let daily=root["daily"] as? [String:Any] {
     for key in ["sunrise","sunset"] {if let times=daily[key] as? [Double],let first=times.first {output[key]=first}}
    }
+   output.merge(lightingForLocation(location,date:now) as! [String:Any]) {_,current in current}
    let weather=output as NSDictionary
    DispatchQueue.main.async {completion(weather,nil)}
   }
  }
  static func isPM(longitude:Double,date:Date)->Bool {
-  let hour=(date.timeIntervalSince1970.truncatingRemainder(dividingBy:86400)/3600+longitude/15+24).truncatingRemainder(dividingBy:24)
-  return hour >= 12
+  solarPosition(latitude:0,longitude:longitude,date:date).isPM
  }
  @objc static func lightingForLocation(_ location:NSDictionary)->NSDictionary {
+  lightingForLocation(location,date:Date())
+ }
+ @objc static func lightingForLocation(_ location:NSDictionary,date:Date)->NSDictionary {
   guard let lat=location["latitude"] as? Double,let lon=location["longitude"] as? Double else {return [:]}
-  let now=Date()
-  return ["elevation":solarElevation(latitude:lat,longitude:lon,date:now),"isPM":isPM(longitude:lon,date:now)]
+  let position=solarPosition(latitude:lat,longitude:lon,date:date)
+  return ["date":date.timeIntervalSince1970,"elevation":position.elevation,"isPM":position.isPM,"isDaylight":position.elevation > -0.833,"solarHourAngle":position.hourAngle]
  }
  static func solarElevation(latitude:Double,longitude:Double,date:Date)->Double {
+  solarPosition(latitude:latitude,longitude:longitude,date:date).elevation
+ }
+ static func solarPosition(latitude:Double,longitude:Double,date:Date)->(elevation:Double,isPM:Bool,hourAngle:Double) {
   var calendar=Calendar(identifier:.gregorian);calendar.timeZone=TimeZone(secondsFromGMT:0)!
   let day=Double(calendar.ordinality(of:.day,in:.year,for:date) ?? 1)
-  let hour=Double(calendar.component(.hour,from:date))+Double(calendar.component(.minute,from:date))/60
+  let hour=Double(calendar.component(.hour,from:date))+Double(calendar.component(.minute,from:date))/60+Double(calendar.component(.second,from:date))/3600
   let g=2*Double.pi/365*(day-1+(hour-12)/24)
   let decl=0.006918-0.399912*cos(g)+0.070257*sin(g)-0.006758*cos(2*g)+0.000907*sin(2*g)-0.002697*cos(3*g)+0.00148*sin(3*g)
   let eq=229.18*(0.000075+0.001868*cos(g)-0.032077*sin(g)-0.014615*cos(2*g)-0.040849*sin(2*g))
-  let angle=(hour*60+eq+4*longitude)/4-180
+  let minutes=((hour*60+eq+4*longitude).truncatingRemainder(dividingBy:1440)+1440).truncatingRemainder(dividingBy:1440)
+  let angle=minutes/4-180
   let rad=Double.pi/180
-  return asin(min(1,max(-1,sin(latitude*rad)*sin(decl)+cos(latitude*rad)*cos(decl)*cos(angle*rad))))/rad
+  let elevation=asin(min(1,max(-1,sin(latitude*rad)*sin(decl)+cos(latitude*rad)*cos(decl)*cos(angle*rad))))/rad
+  return (elevation,angle >= 0,angle)
  }
 }

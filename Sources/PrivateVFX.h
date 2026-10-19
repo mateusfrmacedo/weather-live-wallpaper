@@ -14,6 +14,10 @@
 - (id)parameterOf:(NSString *)object named:(NSString *)name;
 - (void)setParameterOf:(NSString *)object named:(NSString *)name :(id)value;
 - (void)withPointerToParameterOf:(NSString *)object named:(NSString *)name block:(void (^)(void *))block;
+- (void)lock;
+- (void)unlock;
+- (void)startRuntimeThread;
+- (void)stopRuntimeThread;
 - (void)beginTransaction;
 - (void)endTransaction;
 - (void)setEnabled:(NSString *)object enabled:(BOOL)enabled;

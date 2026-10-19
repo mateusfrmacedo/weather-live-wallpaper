@@ -14,7 +14,7 @@ func swiftMoon(_ function:UnsafeRawPointer,_ object:UnsafeRawPointer,_ date:Unsa
 @objc(WeatherRuntime) class WeatherRuntime: NSObject {
  // Rendering updates run on the main thread; preserve the previous configuration
  // so solar updates don't restart every weather layer as a new location.
- static var previousEffect:ObjectIdentifier?
+ static weak var previousEffect:AnyObject?
  static var previousConfiguration:Any?
  // These are runtime types from the installed OS, not replacement definitions.
  // Field descriptors let us construct their values without hardcoding Swift layouts.
@@ -169,7 +169,11 @@ func swiftMoon(_ function:UnsafeRawPointer,_ object:UnsafeRawPointer,_ date:Unsa
    "displayLocation":enumValue(ft("displayLocation"),"locationViewer"),"nativeScreenSize":size]
   for name in ["sunrise","sunset","moonData","collisionViewMetrics"] {values[name]=none(ft(name))}
   for name in ["sunrise","sunset"] {
-   if let timestamp=details[name] as? Double {values[name]=Optional.some(Date(timeIntervalSince1970:timestamp)) as Any}
+   if let timestamp=details[name] as? Double {
+    var calendar=Calendar(identifier:.gregorian);calendar.timeZone=TimeZone(identifier:timeZone) ?? .current
+    let date=Date(timeIntervalSince1970:timestamp)
+    if calendar.isDate(date,inSameDayAs:renderDate) {values[name]=Optional.some(date) as Any}
+   }
   }
   var moonDescription="unavailable"
   if let latitude=details["latitude"] as? Double,let longitude=details["longitude"] as? Double {
@@ -212,12 +216,15 @@ func swiftMoon(_ function:UnsafeRawPointer,_ object:UnsafeRawPointer,_ date:Unsa
   for key in ["starSize","starBrightSize"] {
    if let value=starValues[key] as? SIMD2<Float> {starValues[key]=value * (key=="starSize" ? 0.82 : 0.65)}
   }
-  // Apple's location-viewer composition can place the solar flare outside a
-  // desktop's crop. Reframe its original emitter into the upper sky.
+  // Project the solar hour angle and altitude into the desktop's visible sky.
+  // WeatherUI's default portrait composition can crop the sun out entirely.
   if elevation>0, ["clear","mostlyClear","partlyCloudy"].contains(condition),let sun=starValues["sunRayStartPosition"] as? SIMD3<Float> {
+   let hourAngle=(details["solarHourAngle"] as? Double) ?? ((isPM ? 1.0 : -1.0) * max(0,90-elevation))
    starValues["sunRayPositionFollowsTimeOfDay"]=false
-   starValues["sunRayStartPosition"]=SIMD3<Float>(max(-18,min(18,sun.x*0.32)),16+Float(min(elevation,65)/65)*4,sun.z)
+   starValues["sunRayStartPosition"]=SIMD3<Float>(Float(18*sin(hourAngle * .pi/180)),Float(-18+38*sin(elevation * .pi/180)),sun.z)
   }
+  // Apply the decorative layer change with the rest of the configuration.
+  starValues["starCloudsOpacity"]=Float(0)
   let desktopConfig=Buffer(configType,starValues)
   config=read(configType,desktopConfig.pointer)
 
@@ -235,6 +242,13 @@ func swiftMoon(_ function:UnsafeRawPointer,_ object:UnsafeRawPointer,_ date:Unsa
 
   func destroySky<T>(_ t:T.Type) {gradientResult.assumingMemoryBound(to:T.self).deinitialize(count:1)}
   _openExistential(skyType,do:destroySky)
+  // VFX runs its simulation on a separate thread. Parameter lookup, wrapper
+  // initialization and applyUpdate all access its entity storage.
+  guard let scene=(effect as? NSObject)?.perform(NSSelectorFromString("scene"))?.takeUnretainedValue() as? NSObject,
+        scene.responds(to:NSSelectorFromString("beginTransaction")),
+        scene.responds(to:NSSelectorFromString("endTransaction")) else {return ["error":"VFX scene transactions unavailable"]}
+  scene.perform(NSSelectorFromString("beginTransaction"))
+  defer {scene.perform(NSSelectorFromString("endTransaction"))}
   let wrapperType=type("$s9WeatherUI0A9VFXEffectCMa")
   // Swift's allocating initializer consumes an owned effect argument.
   let wrapperArgs=[UInt(bitPattern:Unmanaged.passRetained(effect).toOpaque()),0,0,0,0,0]
@@ -250,7 +264,7 @@ func swiftMoon(_ function:UnsafeRawPointer,_ object:UnsafeRawPointer,_ date:Unsa
   defer {effectKind.deallocate();cameraKind.deallocate()}
   store(enumValue(type("$s9WeatherUI13VFXEffectTypeOMa"),"background"),effectKind)
   store(values["cameraPositionType"]!,cameraKind)
-  let sameEffect=previousEffect == ObjectIdentifier(effect)
+  let sameEffect=previousEffect === effect
   let lastConfig=(sameEffect ? previousConfiguration : nil).map {optionalSome($0)} ?? none(configOptionalType)
   let optionalSky=optionalSome(sky)
   func invoke<C>(_ cfg:C) {
@@ -274,8 +288,8 @@ func swiftMoon(_ function:UnsafeRawPointer,_ object:UnsafeRawPointer,_ date:Unsa
    }
   }
   _openExistential(sky,do:applyGradient)
-  previousEffect=ObjectIdentifier(effect);previousConfiguration=config
-  return ["condition":condition,"elevation":elevation,"renderer":"Apple WeatherUI + VFX", "configuration":"Apple original", "cloudKind":String(describing:altitude),"gradientLayer":background,"moonData":moonDescription,"sunPosition":String(describing:starValues["sunRayStartPosition"]!),"sunAlpha":(starValues["sunSpikeBallColor"] as? SIMD4<Float>)?.w ?? 0,"moonImage":starValues["moonImageName"]!,"starCount":starValues["starParticleCount"]!,"brightStarCount":starValues["starBrightParticleCount"]!,"starOpacity":starValues["starOpacity"]!]
+  previousEffect=effect;previousConfiguration=config
+  return ["condition":condition,"elevation":elevation,"renderer":"Apple WeatherUI + VFX", "configuration":"Apple original", "cloudKind":String(describing:altitude),"gradientLayer":background,"moonData":moonDescription,"sunPosition":String(describing:starValues["sunRayStartPosition"]!),"sunX":(starValues["sunRayStartPosition"] as? SIMD3<Float>)?.x ?? 0,"sunY":(starValues["sunRayStartPosition"] as? SIMD3<Float>)?.y ?? 0,"moonElevation":starValues["moonElevation"]!,"moonRiseToSet":starValues["moonRiseToSet"]!,"sunAlpha":(starValues["sunSpikeBallColor"] as? SIMD4<Float>)?.w ?? 0,"moonImage":starValues["moonImageName"]!,"starCount":starValues["starParticleCount"]!,"brightStarCount":starValues["starBrightParticleCount"]!,"starOpacity":starValues["starOpacity"]!]
  }
 }
 

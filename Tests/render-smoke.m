@@ -4,6 +4,7 @@
 #import <dlfcn.h>
 @interface NSObject (WeatherSmoke)
 + (BOOL)isSupported;
++ (NSDictionary *)lightingForLocation:(NSDictionary *)location date:(NSDate *)date;
 + (NSDictionary *)applyEffect:(id)effect condition:(NSString *)condition elevation:(double)elevation cloudCover:(double)cover wind:(double)wind size:(CGSize)size isPM:(BOOL)isPM timeZone:(NSString *)timeZone;
 + (NSDictionary *)applyEffect:(id)effect condition:(NSString *)condition elevation:(double)elevation cloudCover:(double)cover wind:(double)wind size:(CGSize)size isPM:(BOOL)isPM timeZone:(NSString *)timeZone details:(NSDictionary *)details;
 - (id)initWithContentsOf:(NSURL *)url options:(id)options error:(NSError **)error;
@@ -51,6 +52,31 @@ int main(void) {@autoreleasepool {
  count++;
  NSDictionary *sun=[NSClassFromString(@"WeatherRuntime") applyEffect:effect condition:@"clear" elevation:35 cloudCover:0 wind:8 size:CGSizeMake(1512,982) isPM:YES timeZone:@"America/Sao_Paulo"];
  if(sun[@"error"] || [sun[@"sunAlpha"] floatValue]<=0 || !sun[@"sunPosition"])return 11;
+ count++;
+ // Solar/lunar updates must use one timestamp, including cached/offline weather.
+ NSDictionary *location=@{@"latitude":@(-20.18222),@"longitude":@(-49.35139)};
+ NSISO8601DateFormatter *formatter=[NSISO8601DateFormatter new];
+ NSMutableArray *lighting=[NSMutableArray new],*moons=[NSMutableArray new],*solarX=[NSMutableArray new],*solarY=[NSMutableArray new];
+ for(NSString *timestamp in @[@"2026-10-18T11:00:00Z",@"2026-10-18T15:00:00Z",@"2026-10-18T19:00:00Z",@"2026-10-19T03:00:00Z"]) {
+  NSDate *date=[formatter dateFromString:timestamp];
+  NSDictionary *light=[NSClassFromString(@"WeatherService") lightingForLocation:location date:date];
+  if([light[@"date"] doubleValue]!=date.timeIntervalSince1970 || !isfinite([light[@"elevation"] doubleValue]))return 12;
+  [lighting addObject:light];
+  NSMutableDictionary *details=[light mutableCopy];[details addEntriesFromDictionary:location];
+  NSDictionary *result=[NSClassFromString(@"WeatherRuntime") applyEffect:effect condition:@"clear" elevation:[light[@"elevation"] doubleValue] cloudCover:0 wind:8 size:CGSizeMake(1512,982) isPM:[light[@"isPM"] boolValue] timeZone:@"America/Sao_Paulo" details:details];
+  if(result[@"error"] || !result[@"moonElevation"] || [result[@"moonData"] isEqual:@"nil"])return 13;
+  NSLog(@"Time %@ solar %@ PM %@ moon %@ progress %@",timestamp,light[@"elevation"],light[@"isPM"],result[@"moonElevation"],result[@"moonRiseToSet"]);
+  [moons addObject:result[@"moonData"]];[solarX addObject:result[@"sunX"]];[solarY addObject:result[@"sunY"]];count++;
+ }
+ if([lighting[0][@"isPM"] boolValue] || ![lighting[2][@"isPM"] boolValue])return 14;
+ if([lighting[1][@"elevation"] doubleValue]<[lighting[0][@"elevation"] doubleValue] || [lighting[1][@"elevation"] doubleValue]<[lighting[2][@"elevation"] doubleValue])return 15;
+ if(![lighting[1][@"isDaylight"] boolValue] || [lighting[3][@"isDaylight"] boolValue])return 16;
+ if([moons[0] isEqual:moons[1]] && [moons[1] isEqual:moons[2]])return 17;
+ if([solarX[0] doubleValue]>=0 || [solarX[2] doubleValue]<=0 || fabs([solarX[1] doubleValue])>1)return 19;
+ if([solarY[1] doubleValue]<=[solarY[0] doubleValue] || [solarY[1] doubleValue]<=[solarY[2] doubleValue])return 20;
+ // Longitude must move solar noon across the UTC date boundary correctly.
+ NSDictionary *west=[NSClassFromString(@"WeatherService") lightingForLocation:@{@"latitude":@0,@"longitude":@(-170)} date:[formatter dateFromString:@"2026-10-18T23:50:00Z"]];
+ if(![west[@"isPM"] boolValue] || ![west[@"isDaylight"] boolValue])return 18;
  count++;
  printf("PASS: %d original WeatherUI configurations, including low/mid/high clouds and sunset inputs.\n",count);
  return 0;

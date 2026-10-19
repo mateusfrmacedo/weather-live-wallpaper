@@ -117,11 +117,14 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  if(!self.live && NSProcessInfo.processInfo.environment[@"WEATHER_ELEVATION"])e=[NSProcessInfo.processInfo.environment[@"WEATHER_ELEVATION"] doubleValue];
  NSMutableDictionary *details=self.live ? [self.liveWeather mutableCopy] : [NSMutableDictionary new];
  if(self.location){details[@"latitude"]=self.location[@"latitude"];details[@"longitude"]=self.location[@"longitude"];}
- NSDictionary *r=[NSClassFromString(@"WeatherRuntime") applyEffect:self.effect condition:self.condition elevation:e cloudCover:self.live ? [self.liveWeather[@"cloudCover"] doubleValue] : cloudCover(self.condition) wind:self.live ? [self.liveWeather[@"wind"] doubleValue] : 12 size:self.view.bounds.size isPM:self.live ? [self.liveWeather[@"isPM"] boolValue] : self.timeControl.selectedSegmentIndex==1 timeZone:self.liveWeather[@"timeZone"] ?: NSTimeZone.localTimeZone.name details:details];
+ NSDictionary *r;
+ // Stop and join VFX's simulation before changing its graph or parameters.
+ // A scene transaction alone does not stop the runtime's cached pointer reads.
+ [self.weatherView setRendersContinuously:NO];[self.scene stopRuntimeThread];
+ [self.weatherView lock];
+ @try {r=[NSClassFromString(@"WeatherRuntime") applyEffect:self.effect condition:self.condition elevation:e cloudCover:self.live ? [self.liveWeather[@"cloudCover"] doubleValue] : cloudCover(self.condition) wind:self.live ? [self.liveWeather[@"wind"] doubleValue] : 12 size:self.view.bounds.size isPM:self.live ? [self.liveWeather[@"isPM"] boolValue] : self.timeControl.selectedSegmentIndex==1 timeZone:self.liveWeather[@"timeZone"] ?: NSTimeZone.localTimeZone.name details:details];}
+ @finally {[self.weatherView unlock];[self.scene startRuntimeThread];[self.weatherView setRendersContinuously:!self.paused];}
  if(r[@"error"]){[self setStatus:r[@"error"]];return;}
- // The decorative nebula atlas produces hard silhouettes in this host.
- // Suppress only this decorative layer, leaving weather clouds and stars intact.
- [self.effect withPointerToParameterOf:@"MAIN" named:@"starCloudsOpacity" block:^(void *p){if(p)*(float *)p=0;}];
  // Weather's night sky recedes toward the horizon. Keep the gradient below
  // the VFX view intact while fading stars and thin cloud effects above it.
  BOOL starry=[@[@"clear",@"mostlyClear",@"partlyCloudy",@"mostlyCloudy"] containsObject:self.condition];
@@ -151,6 +154,9 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
 }
 - (void)displayCurrentWeather {
  if(!self.liveWeather)return;
+ NSMutableDictionary *weather=[self.liveWeather mutableCopy];
+ [weather addEntriesFromDictionary:[NSClassFromString(@"WeatherService") lightingForLocation:self.location]];
+ self.liveWeather=weather;
  self.live=YES;self.condition=self.liveWeather[@"condition"];self.timeControl.enabled=NO;
  double elevation=[self.liveWeather[@"elevation"] doubleValue];self.timeControl.selectedSegmentIndex=elevation>6 ? 0 : elevation> -6 ? 1 : 2;
  self.cityLabel.text=self.location[@"name"];self.temperatureLabel.text=[NSString stringWithFormat:@"%.0f°",[self.liveWeather[@"temperature"] doubleValue]];
@@ -164,13 +170,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
 }
 - (void)automaticTick {
  if(!self.automaticWeather || !self.location)return;
- if(self.liveWeather){
-  NSMutableDictionary *weather=[self.liveWeather mutableCopy];[weather addEntriesFromDictionary:[NSClassFromString(@"WeatherService") lightingForLocation:self.location]];
-  NSNumber *sunrise=weather[@"sunrise"],*sunset=weather[@"sunset"];
-  NSTimeInterval now=NSDate.date.timeIntervalSince1970;
-  weather[@"isDaylight"]=(sunrise && sunset) ? @(now>=sunrise.doubleValue && now<sunset.doubleValue) : @([weather[@"elevation"] doubleValue]> -0.833);
-  self.liveWeather=weather;[self displayCurrentWeather];
- }
+ if(self.liveWeather)[self displayCurrentWeather];
  if(!self.nextWeatherRefresh || [self.nextWeatherRefresh timeIntervalSinceNow]<=0)[self refreshWeather];
 }
 - (void)refreshAfterWake {self.nextWeatherRefresh=nil;[self automaticTick];[self applyRenderingQuality];}
