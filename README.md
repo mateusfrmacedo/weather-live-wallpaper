@@ -8,7 +8,7 @@ An animated macOS wallpaper that follows the weather in your city, using the bui
 
 [Download the latest release](https://github.com/mateusfrmacedo/weather-live-wallpaper/releases/latest).
 
-Open the `.dmg`, drag **Weather Wallpaper.app** to **Applications**, then launch it and choose a city or a weather effect. Press **⌘⇧P** to bring back the controls.
+Open the `.dmg`, drag **Weather Wallpaper.app** to **Applications**, then launch it and choose a city or a weather effect. In **Animação**, choose **Sempre animado** or **Ao bloquear**. For the native lock-screen mode, open **Ajustes de Papel de Parede…** and select **Weather Wallpaper** as the wallpaper and screen saver. Keep the app running for weather updates. Press **⌘⇧P** to bring back the controls.
 
 The app is not notarized. If macOS blocks it, go to **System Settings → Privacy & Security → Open Anyway** after trying to open it.
 
@@ -37,4 +37,4 @@ An optional companion app can animate the lock screen and screen saver while kee
 open "Build/Weather Wallpaper Native.app"
 ```
 
-See [native wallpaper setup, tests and limitations](Sources/NativeWallpaper/README.md). The prototype is built separately from the downloadable release and currently requires local compilation.
+See [native wallpaper setup, tests and limitations](Sources/NativeWallpaper/README.md). The downloadable release includes both playback modes in **Weather Wallpaper.app**. The command above builds a separate development app; `Scripts/package.sh` builds the distributable DMG and ZIP.

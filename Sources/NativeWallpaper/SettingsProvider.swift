@@ -10,7 +10,7 @@ import AppKit
 import Foundation
 
 private let weatherChoiceID = "weather"
-private let weatherDisplayName = "Weather Wallpaper · Protótipo"
+private let weatherDisplayName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Weather Wallpaper"
 
 func buildSettingsViewModelsXPC(thumbnailURL: URL? = nil) -> AnyObject? {
     let bundleID = Bundle.main.bundleIdentifier ?? "local.mateus.WeatherWallpaper.NativePrototype.Extension"
@@ -56,7 +56,7 @@ func buildSettingsViewModelsXPC(thumbnailURL: URL? = nil) -> AnyObject? {
     let group = SettingsGroup(
         id: groupID,
         items: [item],
-        localizedName: "Weather Wallpaper · Protótipo",
+        localizedName: weatherDisplayName,
         disposability: .none,
         sortOrder: -50,
         sortID: GroupSortID(id: "local.mateus.weather"),

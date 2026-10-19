@@ -52,8 +52,11 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
  self.metalLayer.framebufferOnly=NO;object_setClass(self.metalLayer,WWCaptureLayer.class);
  id legacy=[view valueForKey:@"_legacyView"];self.queue=[legacy valueForKey:@"commandQueue"];
  if(!self.queue){[self finish:WWExportError(@"A fila Metal do Tempo não está disponível.")];return;}
- NSString *root=[NSString stringWithFormat:@"/Users/Shared/WeatherWallpaper-%u",getuid()];
+ NSString *root=[NSString stringWithFormat:@"/Users/Shared/WeatherWallpaper/%u",getuid()];
  NSError *error=nil;
+ // A stable entitlement path works for every user's UID. Scene folders stay private.
+ NSString *shared=@"/Users/Shared/WeatherWallpaper";
+ if(![NSFileManager.defaultManager createDirectoryAtPath:shared withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@01777} error:&error]){[self finish:error];return;}
  if(![NSFileManager.defaultManager createDirectoryAtPath:root withIntermediateDirectories:YES attributes:@{NSFilePosixPermissions:@0700} error:&error]){[self finish:error];return;}
  self.directory=[NSURL fileURLWithPath:[root stringByAppendingPathComponent:NSUUID.UUID.UUIDString] isDirectory:YES];
  if(![NSFileManager.defaultManager createDirectoryAtURL:self.directory withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@0700} error:&error]){[self finish:error];return;}

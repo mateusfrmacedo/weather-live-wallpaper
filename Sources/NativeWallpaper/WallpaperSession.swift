@@ -68,7 +68,7 @@ final class WeatherWallpaperSession {
         if previous != policy.phase { debugLog("Playback \(previous) -> \(policy.phase), mode=\(mode) decoded=\(renderedFrameCount)") }
     }
     func loadLatestScene(from rootOverride: URL? = nil) {
-        let rootURL = rootOverride ?? URL(fileURLWithPath: "/Users/Shared/WeatherWallpaper-\(getuid())", isDirectory: true)
+        let rootURL = rootOverride ?? URL(fileURLWithPath: "/Users/Shared/WeatherWallpaper/\(getuid())", isDirectory: true)
         guard let data = try? Data(contentsOf: rootURL.appendingPathComponent("current.json")),
               let manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               manifest["version"] as? Int == 1,

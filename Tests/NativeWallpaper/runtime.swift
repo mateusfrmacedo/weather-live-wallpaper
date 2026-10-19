@@ -72,7 +72,7 @@ func run(for seconds: TimeInterval) { RunLoop.main.run(until: Date(timeIntervalS
             try! FileManager.default.createDirectory(at: fixture, withIntermediateDirectories: true)
             defer { try? FileManager.default.removeItem(at: fixture) }
             let nextGeneration = UUID().uuidString
-            let published = URL(fileURLWithPath: "/Users/Shared/WeatherWallpaper-\(getuid())").appendingPathComponent(session.generation!)
+            let published = URL(fileURLWithPath: "/Users/Shared/WeatherWallpaper/\(getuid())").appendingPathComponent(session.generation!)
             try! FileManager.default.copyItem(at: published, to: fixture.appendingPathComponent(nextGeneration))
             try! JSONSerialization.data(withJSONObject: ["version": 1, "generation": nextGeneration]).write(to: fixture.appendingPathComponent("current.json"))
             session.loadLatestScene(from: fixture)
