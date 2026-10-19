@@ -65,6 +65,10 @@
  self.liveWeather=@{@"condition":self.condition,@"elevation":@((index%3)==0 ? 35 : (index%3)==1 ? 1 : -25),@"cloudCover":@0.45,@"wind":@12,@"isPM":@(index%2),@"timeZone":@"America/Sao_Paulo",@"date":@(1792360800+(index%24)*3600)};
  if(index%20==0)self.view.bounds=CGRectMake(0,0,index%40 ? 1200 : 900,index%40 ? 700 : 850);
  [self applyWeather];
+ if([@[@"clear",@"mostlyClear"] containsObject:self.condition] && [self.liveWeather[@"elevation"] doubleValue]<-10){
+  CAGradientLayer *fade=self.nightSkyMask;
+  if(!fade || self.weatherView.layer.mask!=fade || !CGRectEqualToRect(fade.frame,self.weatherView.bounds) || CGColorGetAlpha((__bridge CGColorRef)fade.colors.firstObject)<0.99 || CGColorGetAlpha((__bridge CGColorRef)fade.colors.lastObject)<=0 || CGColorGetAlpha((__bridge CGColorRef)fade.colors.lastObject)>0.2){NSLog(@"FAIL: night horizon fade or corner coverage");exit(1);}
+ }else if([self.condition isEqual:@"rain"] && self.nightSkyMask){NSLog(@"FAIL: night fade affected precipitation");exit(1);}
  if(self.view.layer.sublayers.firstObject!=self.skyGradient){NSLog(@"FAIL: gradient covers the renderer");exit(1);}
  if(index%50==0){[self togglePause];[self togglePause];NSLog(@"Live render updates: %ld",(long)index);}
  if(self.testUpdates>=200){

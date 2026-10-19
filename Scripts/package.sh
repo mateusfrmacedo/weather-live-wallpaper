@@ -38,8 +38,9 @@ Mantenha o app aberto para atualizar o clima. A primeira preparação
 leva alguns segundos. A seleção anterior do papel de parede do sistema
 não é substituída automaticamente.
 
-Novidades 0.3.1: lua e estrelas com brilho mais sutil, movimento lunar
-atualizado, estrelas nos cantos e estrela cadente em toda a largura.
+Novidades 0.3.2: halo lunar reduzido preservando os detalhes da lua,
+estrelas mais discretas na parte inferior e captura Retina com HEVC.
+Mantém o movimento lunar atualizado e a estrela cadente em toda a largura.
 Inclui dois modos de animação, configurações compactas,
 botões Liquid Glass e preferência de modo salva.
 O loop nativo é experimental e pode apresentar uma emenda visível.

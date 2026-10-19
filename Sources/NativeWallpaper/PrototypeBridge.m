@@ -28,7 +28,13 @@
  self.qualityCard.hidden=!continuous;self.pauseControl.hidden=!continuous;self.pauseControl.enabled=![state[@"preparing"] boolValue];
 }
 - (void)playbackChanged:(NSButton *)sender {[(id)self.controller setContinuousWallpaperEnabled:sender.tag==1];[self refreshSettings];}
-- (void)setLiveDesktopEnabled:(BOOL)enabled {[self setWallpaper:enabled];if(!enabled)[self hideNativeRenderWindow];}
+- (void)prepareNativeRenderWindow {
+ NSWindow *window=self.window;if(!window)return;
+ window.styleMask=NSWindowStyleMaskBorderless;
+ [window setFrame:(window.screen ?: NSScreen.mainScreen).frame display:YES];
+ if(!self.wallpaper)[window orderOut:nil];
+}
+- (void)setLiveDesktopEnabled:(BOOL)enabled {[self setWallpaper:enabled];if(!enabled){[self prepareNativeRenderWindow];[self hideNativeRenderWindow];}}
 - (void)openNativeWallpaperSettings {[NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:@"x-apple.systempreferences:com.apple.Wallpaper-Settings.extension"]];}
 - (void)hideNativeRenderWindow {[self.window orderOut:nil];}
 @end

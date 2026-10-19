@@ -8,6 +8,7 @@
 @interface NSObject (NativePrototypeBridge)
 - (void)openNativeWallpaperSettings;
 - (void)hideNativeRenderWindow;
+- (void)prepareNativeRenderWindow;
 - (void)setLiveDesktopEnabled:(BOOL)enabled;
 @end
 
@@ -30,11 +31,12 @@
  self.exporter=[WWSceneExporter new];[super viewDidLoad];
 }
 - (void)viewDidAppear:(BOOL)animated {
- [super viewDidAppear:animated];self.appeared=YES;
+ [super viewDidAppear:animated];if(self.appeared)return;
+ [self.desktopBridge prepareNativeRenderWindow];
  self.panel.hidden=YES;[self.desktopBridge settingsMessage:@"Preparando animação…"];
  if(NSProcessInfo.processInfo.environment[@"WEATHER_NATIVE_TEST_HIDDEN"])[self.desktopBridge hideNativeRenderWindow];
  if(!NSProcessInfo.processInfo.environment[@"WEATHER_NATIVE_TEST_ONCE"])[self.desktopBridge showPreferences];
- [self applyWeather];[self restorePlaybackMode];
+ dispatch_async(dispatch_get_main_queue(),^{self.appeared=YES;[self applyWeather];[self restorePlaybackMode];});
 }
 - (BOOL)continuousWallpaperEnabled {return [NSUserDefaults.standardUserDefaults boolForKey:@"ContinuousDesktopEnabled"];}
 - (NSDictionary *)settingsState {
@@ -56,7 +58,7 @@
 }
 - (NSDictionary *)sceneMetadata {
  double elevation=self.live ? [self.liveWeather[@"elevation"] doubleValue] : (self.timeControl.selectedSegmentIndex==0 ? 35 : self.timeControl.selectedSegmentIndex==1 ? 1 : -25);
- return @{@"condition":self.condition ?: @"partlyCloudy",@"locationID":[self locationIdentifier],@"manualTime":self.live ? @(-1) : @(self.timeControl.selectedSegmentIndex),@"elevation":@(elevation),@"cloudCover":self.live ? self.liveWeather[@"cloudCover"] ?: @0 : @(cloudCover(self.condition)),@"wind":self.live ? self.liveWeather[@"wind"] ?: @12 : @12};
+ return @{@"renderWidth":@(self.view.bounds.size.width),@"renderHeight":@(self.view.bounds.size.height),@"renderScale":@(self.view.window.screen.scale ?: UIScreen.mainScreen.scale),@"condition":self.condition ?: @"partlyCloudy",@"locationID":[self locationIdentifier],@"manualTime":self.live ? @(-1) : @(self.timeControl.selectedSegmentIndex),@"elevation":@(elevation),@"cloudCover":self.live ? self.liveWeather[@"cloudCover"] ?: @0 : @(cloudCover(self.condition)),@"wind":self.live ? self.liveWeather[@"wind"] ?: @12 : @12};
 }
 - (void)applyWeather {
  if(!self.appeared)return;
@@ -65,7 +67,7 @@
  if(!WWNeedsNewScene(self.publishedScene,metadata,self.publishedDate ? -self.publishedDate.timeIntervalSinceNow : INFINITY)){if(self.continuousWallpaperEnabled)[super applyWeather];return;}
  self.paused=NO;[super applyWeather];
  if(!self.weatherView || !self.scene)return;
- // Bound the recording resolution independently of a Retina display.
+ // Match capture cadence; the exporter retains the drawable’s Retina pixels.
  [self.weatherView setPreferredFramesPerSecond:24];[self.weatherView _allowGPUBackgroundExecution];
  self.panel.hidden=YES;self.exportPending=NO;
  __weak typeof(self) weakSelf=self;

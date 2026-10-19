@@ -16,5 +16,6 @@ int main(void){@autoreleasepool{
  NSMutableDictionary *night=[base mutableCopy];night[@"elevation"]=@(-20);
  NSCAssert(!WWNeedsNewScene(night,night,299) && WWNeedsNewScene(night,night,300),@"Moon position must refresh every five minutes at night");
  next=[base mutableCopy];next[@"cloudCover"]=@0.7;NSCAssert(WWNeedsNewScene(base,next,600),@"Cloud coverage update");
+ next=[base mutableCopy];next[@"renderWidth"]=@1512;next[@"renderHeight"]=@982;next[@"renderScale"]=@2;NSCAssert(WWNeedsNewScene(base,next,1),@"Display pixel changes must re-export immediately");
  NSLog(@"PASS: weather change policy");return 0;
 }}

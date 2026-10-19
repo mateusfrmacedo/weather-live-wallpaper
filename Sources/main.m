@@ -1,4 +1,5 @@
 #import "SkyGeometry.h"
+#import "SkyTextures.h"
 #import "ShootingStar.m"
 #import "PrivateVFX.h"
 #import <dlfcn.h>
@@ -72,7 +73,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  NSString *root=@"/System/iOSSupport/System/Library/PrivateFrameworks/WeatherUI.framework/Resources";
  id options=[NSClassFromString(@"VFXSceneLoadOptions") new];[options setValue:@YES forKey:@"loadBindingsMetadata"];
  [options setValue:[NSURL fileURLWithPath:[root stringByAppendingPathComponent:@"default.metallib"]] forKey:@"metalLibraryURL"];
- NSError *error=nil;self.scene=[[NSClassFromString(@"VFX.VFXScene") alloc] initWithContentsOf:[NSURL fileURLWithPath:[root stringByAppendingPathComponent:@"VFX/WeatherV136_Default_Background.vfx"]] options:options error:&error];
+ NSError *error=nil;self.scene=[[NSClassFromString(@"VFX.VFXScene") alloc] initWithContentsOf:WWSubtleMoonScene([NSURL fileURLWithPath:[root stringByAppendingPathComponent:@"VFX/WeatherV136_Default_Background.vfx"]]) options:options error:&error];
  if(!self.scene){[self setStatus:error.localizedDescription ?: @"Não foi possível carregar a cena do Tempo."];return NO;}
  self.effect=[self.scene addEffectWithEffectID:0];if(!self.effect){[self setStatus:@"O formato da cena do Tempo mudou."];return NO;}
  return YES;
@@ -148,9 +149,15 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  [self.scene setPaused:self.paused];[self.scene setIsPlaying:!self.paused];
  [self.weatherView setRendersContinuously:!self.paused];
  if(self.wallpaper)[self.weatherView _allowGPUBackgroundExecution];
- // Keep the complete native sky: a whole-view mask also attenuates the moon
- // and removes stars at the bottom corners of landscape displays.
+ // Fade the clear night sky gently toward the horizon. Keep a nonzero floor
+ // so landscape corners retain a few faint stars rather than ending abruptly.
  self.weatherView.layer.mask=nil;self.nightSkyMask=nil;
+ if([r[@"starOpacity"] doubleValue]>0 && [@[@"clear",@"mostlyClear"] containsObject:self.condition]){
+  self.nightSkyMask=[CAGradientLayer layer];self.nightSkyMask.frame=self.weatherView.bounds;
+  self.nightSkyMask.colors=@[(id)UIColor.blackColor.CGColor,(id)UIColor.blackColor.CGColor,(id)[UIColor colorWithWhite:0 alpha:0.55].CGColor,(id)[UIColor colorWithWhite:0 alpha:0.12].CGColor];
+  self.nightSkyMask.locations=@[@0,@0.32,@0.68,@1];
+  self.weatherView.layer.mask=self.nightSkyMask;
+ }
  CAGradientLayer *gradient=r[@"gradientLayer"];[CATransaction begin];[CATransaction setDisableActions:YES];self.skyGradient.colors=gradient.colors;self.skyGradient.locations=gradient.locations;self.skyGradient.startPoint=gradient.startPoint;self.skyGradient.endPoint=gradient.endPoint;[CATransaction commit];
  self.conditionLabel.text=conditionTitle(self.condition);UIButtonConfiguration *config=[self.sceneButton.configuration copy];config.title=conditionTitle(self.condition);self.sceneButton.configuration=config;[self setStatus:@""];NSLog(@"Rendered condition=%@ elevation=%.2f live=%d",self.condition,e,self.live);
 }

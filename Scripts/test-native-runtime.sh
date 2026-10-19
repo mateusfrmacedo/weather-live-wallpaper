@@ -12,3 +12,8 @@ xcrun swiftc -swift-version 5 -target arm64-apple-macos27.0 -sdk "$sdk" -parse-a
  Sources/NativeWallpaper/CodableShims.swift Sources/NativeWallpaper/SettingsProvider.swift \
  Tests/NativeWallpaper/runtime.swift Build/WallpaperRuntime.o -o Build/test-native-runtime
 Build/test-native-runtime
+
+xcrun swiftc -swift-version 5 -target arm64-apple-macos27.0 -sdk "$sdk" -parse-as-library \
+ -framework Foundation -framework AVFoundation -framework ImageIO -framework CoreMedia \
+ Tests/NativeWallpaper/export-quality.swift -o Build/test-native-export-quality
+Build/test-native-export-quality

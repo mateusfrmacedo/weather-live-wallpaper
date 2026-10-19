@@ -41,13 +41,14 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
 @property(nonatomic,strong) NSDictionary *metadata;
 @property(nonatomic,copy) void(^completion)(NSError *);
 @property(nonatomic) NSInteger frames,attempts;
+@property(nonatomic) CFTimeInterval firstFrameTime;
 @property(nonatomic) CGSize outputSize;
 @end
 @implementation WWSceneExporter
 - (void)exportView:(UIView *)view gradient:(CAGradientLayer *)gradient metadata:(NSDictionary *)metadata completion:(void(^)(NSError *))completion {
  NSAssert(NSThread.isMainThread,@"Scene export must start on the main thread");
  if(self.busy){completion(WWExportError(@"Já existe uma cena sendo preparada."));return;}
- self.busy=YES;self.view=view;self.gradient=gradient;self.metadata=metadata;self.completion=completion;self.frames=0;self.attempts=0;
+ self.busy=YES;self.view=view;self.gradient=gradient;self.metadata=metadata;self.completion=completion;self.frames=0;self.attempts=0;self.firstFrameTime=0;
  self.metalLayer=WWMetalLayer(view.layer);
  if(!self.metalLayer || self.metalLayer.class!=CAMetalLayer.class){[self finish:WWExportError(@"O formato da camada Metal mudou.")];return;}
  self.metalLayer.framebufferOnly=NO;object_setClass(self.metalLayer,WWCaptureLayer.class);
@@ -64,12 +65,16 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
  if(![NSFileManager.defaultManager createDirectoryAtPath:root withIntermediateDirectories:YES attributes:@{NSFilePosixPermissions:@0700} error:&error]){[self finish:error];return;}
  self.directory=[NSURL fileURLWithPath:[root stringByAppendingPathComponent:NSUUID.UUID.UUIDString] isDirectory:YES];
  if(![NSFileManager.defaultManager createDirectoryAtURL:self.directory withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@0700} error:&error]){[self finish:error];return;}
- CGFloat scale=MIN(1,1920/view.bounds.size.width);
- self.outputSize=CGSizeMake(floor(view.bounds.size.width*scale/2)*2,floor(view.bounds.size.height*scale/2)*2);
+ // Match real drawable pixels, not logical Cocoa points. A Retina display
+ // must not upscale a half-resolution recording back onto its physical pixels.
+ CGSize pixels=self.metalLayer.drawableSize;
+ if(pixels.width<2 || pixels.height<2){CGFloat backing=view.window.screen.scale ?: UIScreen.mainScreen.scale;pixels=CGSizeMake(view.bounds.size.width*backing,view.bounds.size.height*backing);}
+ CGFloat scale=MIN(1,5120/MAX(pixels.width,pixels.height));
+ self.outputSize=CGSizeMake(floor(pixels.width*scale/2)*2,floor(pixels.height*scale/2)*2);
  if(self.outputSize.width<2 || self.outputSize.height<2){[self finish:WWExportError(@"A cena ainda não tem tamanho válido.")];return;}
  self.writer=[[AVAssetWriter alloc] initWithURL:[self.directory URLByAppendingPathComponent:@"sky.mov"] fileType:AVFileTypeQuickTimeMovie error:&error];
  if(!self.writer){[self finish:error];return;}
- NSDictionary *settings=@{AVVideoCodecKey:AVVideoCodecTypeH264,AVVideoWidthKey:@(self.outputSize.width),AVVideoHeightKey:@(self.outputSize.height),AVVideoCompressionPropertiesKey:@{AVVideoAverageBitRateKey:@6000000,AVVideoExpectedSourceFrameRateKey:@24,AVVideoMaxKeyFrameIntervalKey:@24},AVVideoColorPropertiesKey:@{AVVideoColorPrimariesKey:AVVideoColorPrimaries_ITU_R_709_2,AVVideoTransferFunctionKey:AVVideoTransferFunction_ITU_R_709_2,AVVideoYCbCrMatrixKey:AVVideoYCbCrMatrix_ITU_R_709_2}};
+ NSDictionary *settings=@{AVVideoCodecKey:AVVideoCodecTypeHEVC,AVVideoWidthKey:@(self.outputSize.width),AVVideoHeightKey:@(self.outputSize.height),AVVideoCompressionPropertiesKey:@{AVVideoAverageBitRateKey:@(MAX(16000000,self.outputSize.width*self.outputSize.height*5)),AVVideoExpectedSourceFrameRateKey:@24,AVVideoMaxKeyFrameIntervalKey:@24},AVVideoColorPropertiesKey:@{AVVideoColorPrimariesKey:AVVideoColorPrimaries_ITU_R_709_2,AVVideoTransferFunctionKey:AVVideoTransferFunction_ITU_R_709_2,AVVideoYCbCrMatrixKey:AVVideoYCbCrMatrix_ITU_R_709_2}};
  self.input=[AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeVideo outputSettings:settings];self.input.expectsMediaDataInRealTime=YES;
  self.adaptor=[AVAssetWriterInputPixelBufferAdaptor assetWriterInputPixelBufferAdaptorWithAssetWriterInput:self.input sourcePixelBufferAttributes:@{(id)kCVPixelBufferPixelFormatTypeKey:@(kCVPixelFormatType_32BGRA),(id)kCVPixelBufferWidthKey:@(self.outputSize.width),(id)kCVPixelBufferHeightKey:@(self.outputSize.height),(id)kCVPixelBufferCGImageCompatibilityKey:@YES,(id)kCVPixelBufferCGBitmapContextCompatibilityKey:@YES}];
  if(![self.writer canAddInput:self.input]){[self finish:WWExportError(@"O codificador de vídeo não está disponível.")];return;}
@@ -86,7 +91,7 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
 }
 - (void)captureFrame {
  @autoreleasepool {
- if(++self.attempts>24*30){[self finish:WWExportError(@"A geração do vídeo excedeu 30 segundos.")];return;}
+ if(++self.attempts>24*90){[self finish:WWExportError(@"A geração do vídeo excedeu 90 segundos.")];return;}
  if(!self.input.readyForMoreMediaData)return;
  id legacy=[self.view valueForKey:@"_legacyView"];
  [legacy renderWithCompletion:^{}];
@@ -99,6 +104,7 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
  id<CAMetalDrawable> drawable;
  @synchronized(self.metalLayer){drawable=objc_getAssociatedObject(self.metalLayer,@selector(nextDrawable));}
  id<MTLTexture> texture=drawable.texture;if(!texture)return;
+ if(self.frames==0 && self.attempts==1)NSLog(@"Native export points %.0fx%.0f, drawable %lux%lu, output %.0fx%.0f HEVC",self.view.bounds.size.width,self.view.bounds.size.height,(unsigned long)texture.width,(unsigned long)texture.height,self.outputSize.width,self.outputSize.height);
  NSUInteger row=((texture.width*4+255)/256)*256;
  id<MTLBuffer> buffer=[texture.device newBufferWithLength:row*texture.height options:MTLResourceStorageModeShared];
  id<MTLCommandBuffer> command=[self.queue commandBuffer];id<MTLBlitCommandEncoder> blit=[command blitCommandEncoder];
@@ -117,7 +123,10 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
   if(self.view.layer.mask){
    UIGraphicsImageRendererFormat *mf=[UIGraphicsImageRendererFormat defaultFormat];mf.scale=1;
    UIImage *mask=[[[UIGraphicsImageRenderer alloc] initWithSize:self.view.bounds.size format:mf] imageWithActions:^(UIGraphicsImageRendererContext *mc){[self.view.layer.mask renderInContext:mc.CGContext];}];
+   // Quartz masks use image coordinates; UIKit's context has its Y axis flipped.
+   CGContextTranslateCTM(context.CGContext,0,self.view.bounds.size.height);CGContextScaleCTM(context.CGContext,1,-1);
    CGContextClipToMask(context.CGContext,self.view.bounds,mask.CGImage);
+   CGContextTranslateCTM(context.CGContext,0,self.view.bounds.size.height);CGContextScaleCTM(context.CGContext,1,-1);
   }
   [[UIImage imageWithCGImage:image] drawInRect:self.view.bounds];
   [WWShootingStarForView(self.view) drawCurrentFrameInContext:context.CGContext];
@@ -130,13 +139,18 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
  CGContextRef target=CGBitmapContextCreate(CVPixelBufferGetBaseAddress(pixel),self.outputSize.width,self.outputSize.height,8,CVPixelBufferGetBytesPerRow(pixel),space,kCGImageAlphaPremultipliedFirst|kCGBitmapByteOrder32Little);
  if(target)CGContextDrawImage(target,CGRectMake(0,0,self.outputSize.width,self.outputSize.height),frame.CGImage);
  if(target)CGContextRelease(target);CGColorSpaceRelease(space);CVPixelBufferUnlockBaseAddress(pixel,0);
- BOOL appended=target && [self.adaptor appendPixelBuffer:pixel withPresentationTime:CMTimeMake(self.frames,24)];CVPixelBufferRelease(pixel);
+ // Preserve animation speed when a Retina frame takes longer than one tick.
+ CFTimeInterval capturedAt=CACurrentMediaTime();
+ if(self.frames==0)self.firstFrameTime=capturedAt;
+ CMTime presentation=CMTimeMakeWithSeconds(capturedAt-self.firstFrameTime,60000);
+ BOOL appended=target && [self.adaptor appendPixelBuffer:pixel withPresentationTime:presentation];CVPixelBufferRelease(pixel);
  if(!appended){[self finish:self.writer.error ?: WWExportError(@"O codificador rejeitou um quadro.")];return;}
- if(++self.frames<384)return;
- [self.timer invalidate];self.timer=nil;[self.input markAsFinished];[self.writer endSessionAtSourceTime:CMTimeMake(self.frames,24)];
+ ++self.frames;
+ if(CMTimeGetSeconds(presentation)<16)return;
+ [self.timer invalidate];self.timer=nil;[self.input markAsFinished];[self.writer endSessionAtSourceTime:CMTimeAdd(presentation,CMTimeMake(1,24))];
  [self.writer finishWritingWithCompletionHandler:^{dispatch_async(dispatch_get_main_queue(),^{
   if(self.writer.status!=AVAssetWriterStatusCompleted){[self finish:self.writer.error ?: WWExportError(@"O vídeo não foi finalizado.")];return;}
-  NSMutableDictionary *manifest=[self.metadata mutableCopy];manifest[@"version"]=@1;manifest[@"generation"]=self.directory.lastPathComponent;manifest[@"publishedAt"]=@(NSDate.date.timeIntervalSince1970);
+  NSMutableDictionary *manifest=[self.metadata mutableCopy];manifest[@"version"]=@1;manifest[@"generation"]=self.directory.lastPathComponent;manifest[@"pixelWidth"]=@(self.outputSize.width);manifest[@"pixelHeight"]=@(self.outputSize.height);manifest[@"codec"]=@"hevc";manifest[@"publishedAt"]=@(NSDate.date.timeIntervalSince1970);
   NSURL *url=[[self.directory URLByDeletingLastPathComponent] URLByAppendingPathComponent:@"current.json"];
   NSError *error=nil;NSData *data=[NSJSONSerialization dataWithJSONObject:manifest options:0 error:&error];
   if(data && ![data writeToURL:url options:NSDataWritingAtomic error:&error])data=nil;
