@@ -3,6 +3,13 @@
 #import "../Sources/main.m"
 #undef main
 
+@interface NSObject (NativeSettingsTestAPI)
+- (void)selectItem:(id)item;
+- (void)weatherChanged:(id)sender;
+- (void)dockChanged:(id)sender;
+- (void)close;
+@end
+
 @interface RenderTestController : WeatherController
 @property(nonatomic) NSInteger testUpdates;
 @property(nonatomic,strong) NSTimer *testTimer;
@@ -28,7 +35,20 @@
   [self showPreferences];id settings=[self.desktopBridge valueForKey:@"settingsWindow"];
   if(!self.wallpaper || ![[self.desktopBridge valueForKey:@"wallpaper"] boolValue] || settings==desktop || ![[settings valueForKey:@"visible"] boolValue] || self.scene!=scene || self.weatherView!=view || ![frame isEqual:[desktop valueForKey:@"frame"]] || ![level isEqual:[desktop valueForKey:@"level"]]){NSLog(@"FAIL: preferences moved or replaced the wallpaper");exit(1);}
   if(self.firstSettingsWindow && self.firstSettingsWindow!=settings){NSLog(@"FAIL: duplicate settings window");exit(1);}
-  self.firstSettingsWindow=settings;[settings performSelector:NSSelectorFromString(@"close")];
+  self.firstSettingsWindow=settings;
+  id weather=[self.desktopBridge valueForKey:@"weatherControl"];
+  for(NSString *condition in @[@"clear",@"rain",@"snow",@"thunderstorms",@"freezingRain",@"freezingDrizzle",@"windy"]){
+   for(id item in [weather valueForKey:@"itemArray"])if([[item valueForKey:@"representedObject"] isEqual:condition]){[weather selectItem:item];break;}
+   [self.desktopBridge weatherChanged:weather];
+   if(self.live || self.automaticWeather || ![self.condition isEqual:condition] || !self.wallpaper){NSLog(@"FAIL: manual weather selection %@",condition);exit(1);}
+  }
+  [self setPreviewTime:2];if(self.timeControl.selectedSegmentIndex!=2){NSLog(@"FAIL: manual time selection");exit(1);}
+  id dock=[self.desktopBridge valueForKey:@"dockControl"];
+  for(NSNumber *visible in @[@YES,@NO]){
+   [dock setValue:visible forKey:@"state"];[self.desktopBridge dockChanged:dock];
+   if([[self.desktopBridge valueForKey:@"dockVisible"] boolValue]!=visible.boolValue || ![frame isEqual:[desktop valueForKey:@"frame"]] || ![level isEqual:[desktop valueForKey:@"level"]]){NSLog(@"FAIL: Dock visibility changed wallpaper");exit(1);}
+  }
+  [settings close];
   if(!self.wallpaper || ![[self.desktopBridge valueForKey:@"wallpaper"] boolValue]){NSLog(@"FAIL: closing preferences stopped the wallpaper");exit(1);}
  }
  if(index%40==20)[self showPreview];

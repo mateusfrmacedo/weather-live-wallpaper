@@ -8,7 +8,7 @@ An animated macOS wallpaper that follows the weather in your city, using the bui
 
 [Download the latest release](https://github.com/mateusfrmacedo/weather-live-wallpaper/releases/latest).
 
-Open the `.dmg`, drag **Weather Wallpaper.app** to **Applications**, then launch it and choose a city. Press **⌘⇧P** to bring back the controls.
+Open the `.dmg`, drag **Weather Wallpaper.app** to **Applications**, then launch it and choose a city or a weather effect. Press **⌘⇧P** to bring back the controls.
 
 The app is not notarized. If macOS blocks it, go to **System Settings → Privacy & Security → Open Anyway** after trying to open it.
 

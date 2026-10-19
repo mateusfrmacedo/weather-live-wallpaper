@@ -51,7 +51,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
 }
 - (void)viewDidLoad {
  [super viewDidLoad];self.view.backgroundColor=[UIColor colorWithRed:0.08 green:0.16 blue:0.25 alpha:1];
- self.condition=NSProcessInfo.processInfo.environment[@"WEATHER_SCENE"] ?: @"partlyCloudy";
+ self.condition=NSProcessInfo.processInfo.environment[@"WEATHER_SCENE"] ?: [NSUserDefaults.standardUserDefaults stringForKey:@"ManualWeatherCondition"] ?: @"partlyCloudy";
  self.location=[NSUserDefaults.standardUserDefaults dictionaryForKey:@"SelectedLocation"];
  NSUserDefaults *defaults=NSUserDefaults.standardUserDefaults;
  self.automaticWeather=[defaults objectForKey:@"AutomaticWeatherEnabled"]==nil || [defaults boolForKey:@"AutomaticWeatherEnabled"];
@@ -85,7 +85,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  UILabel *hint=[self label:@"Céu, luz e partículas do app Tempo." size:12 weight:UIFontWeightRegular];hint.textColor=[UIColor colorWithWhite:1 alpha:0.65];[stack addArrangedSubview:hint];
  UIView *rule=[UIView new];rule.backgroundColor=[UIColor colorWithWhite:1 alpha:0.14];[rule.heightAnchor constraintEqualToConstant:0.5].active=YES;[stack addArrangedSubview:rule];
  self.sceneButton=[self button:@"Escolher clima" action:nil filled:NO];self.sceneButton.showsMenuAsPrimaryAction=YES;[stack addArrangedSubview:self.sceneButton];[self buildSceneMenu];
- self.timeControl=[[UISegmentedControl alloc] initWithItems:@[@"Dia",@"Entardecer",@"Noite"]];self.timeControl.selectedSegmentIndex=0;[self.timeControl addTarget:self action:@selector(timeChanged) forControlEvents:UIControlEventValueChanged];[stack addArrangedSubview:self.timeControl];
+ self.timeControl=[[UISegmentedControl alloc] initWithItems:@[@"Dia",@"Entardecer",@"Noite"]];self.timeControl.selectedSegmentIndex=[NSUserDefaults.standardUserDefaults integerForKey:@"ManualWeatherTime"];[self.timeControl addTarget:self action:@selector(timeChanged) forControlEvents:UIControlEventValueChanged];[stack addArrangedSubview:self.timeControl];
  self.cityField=[UITextField new];self.cityField.placeholder=@"Buscar cidade";self.cityField.borderStyle=UITextBorderStyleRoundedRect;self.cityField.backgroundColor=[UIColor colorWithWhite:1 alpha:0.08];self.cityField.textColor=UIColor.whiteColor;self.cityField.delegate=self;self.cityField.returnKeyType=UIReturnKeySearch;[self.cityField.heightAnchor constraintEqualToConstant:34].active=YES;[stack addArrangedSubview:self.cityField];
  self.liveButton=[self button:@"Usar clima da cidade" action:@selector(searchCity) filled:NO];[stack addArrangedSubview:self.liveButton];
  [stack addArrangedSubview:[self button:@"Usar como wallpaper" action:@selector(useWallpaper) filled:YES]];
@@ -110,8 +110,9 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  if([self.desktopBridge launchedAtLogin] || [self.desktopBridge loginItemStatus]==1 || [NSProcessInfo.processInfo.arguments containsObject:@"--background"])[self useWallpaper];
  }
 }
-- (void)selectCondition:(NSString *)c {self.live=NO;self.automaticWeather=NO;[NSUserDefaults.standardUserDefaults setBool:NO forKey:@"AutomaticWeatherEnabled"];self.requestGeneration++;self.requesting=NO;self.condition=c;self.timeControl.enabled=YES;self.cityLabel.text=@"Prévia do clima";self.temperatureLabel.text=@"—°";[self applyWeather];[self buildSceneMenu];[self rebuildPreferences];}
-- (void)timeChanged {if(!self.live)[self applyWeather];}
+- (void)selectCondition:(NSString *)c {self.live=NO;self.automaticWeather=NO;[NSUserDefaults.standardUserDefaults setBool:NO forKey:@"AutomaticWeatherEnabled"];self.requestGeneration++;self.requesting=NO;self.condition=c;[NSUserDefaults.standardUserDefaults setObject:c forKey:@"ManualWeatherCondition"];self.timeControl.enabled=YES;self.cityLabel.text=@"Prévia do clima";self.temperatureLabel.text=@"—°";[self applyWeather];[self buildSceneMenu];[self rebuildPreferences];}
+- (void)timeChanged {[NSUserDefaults.standardUserDefaults setInteger:self.timeControl.selectedSegmentIndex forKey:@"ManualWeatherTime"];if(!self.live)[self applyWeather];}
+- (void)setPreviewTime:(NSInteger)time {if(time<0 || time>2)return;self.timeControl.selectedSegmentIndex=time;[self timeChanged];[self rebuildPreferences];}
 - (void)applyWeather {
  if(!self.ready || self.applyingWeather)return;
  self.applyingWeather=YES;
@@ -212,8 +213,8 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
 - (void)rebuildPreferences {[self.desktopBridge refreshSettings];}
 - (NSDictionary *)settingsState {
  BOOL high=[NSUserDefaults.standardUserDefaults objectForKey:@"HighQualityRendering"]==nil || [NSUserDefaults.standardUserDefaults boolForKey:@"HighQualityRendering"];
- NSString *summary=self.live ? [NSString stringWithFormat:@"%.0f° · %@",[self.liveWeather[@"temperature"] doubleValue],conditionTitle(self.condition)] : @"Clima da cidade escolhida no seu desktop";
- return @{@"city":self.location[@"name"] ?: @"Escolha uma cidade",@"summary":summary,@"automatic":@(self.automaticWeather),@"highQuality":@(high),@"paused":@(self.paused)};
+ NSString *summary=self.live ? [NSString stringWithFormat:@"%.0f° · %@",[self.liveWeather[@"temperature"] doubleValue],conditionTitle(self.condition)] : [NSString stringWithFormat:@"%@ · Clima manual",conditionTitle(self.condition)];
+ return @{@"city":self.location[@"name"] ?: @"Escolha uma cidade",@"summary":summary,@"automatic":@(self.automaticWeather),@"condition":self.condition,@"previewTime":@(self.timeControl.selectedSegmentIndex),@"highQuality":@(high),@"paused":@(self.paused)};
 }
 - (void)setAutomaticWeatherEnabled:(BOOL)enabled {
  if(enabled){[self enableAutomaticWeather];return;}
