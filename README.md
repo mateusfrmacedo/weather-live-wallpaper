@@ -27,3 +27,14 @@ cd weather-live-wallpaper
 ```
 
 Installs to `~/Applications/Weather Wallpaper.app`.
+
+## Native lock-screen wallpaper prototype
+
+An optional companion app can animate the lock screen and screen saver while keeping the desktop static. Its compact native settings also let you switch back to continuous desktop animation, with Liquid Glass action buttons on supported systems.
+
+```sh
+./Scripts/build-native-prototype.sh
+open "Build/Weather Wallpaper Native.app"
+```
+
+See [native wallpaper setup, tests and limitations](Sources/NativeWallpaper/README.md). The prototype is built separately from the downloadable release and currently requires local compilation.
