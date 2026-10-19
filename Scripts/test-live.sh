@@ -12,7 +12,7 @@ cp Sources/Info.plist "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set UIApplicationSceneManifest:UISceneConfigurations:UIWindowSceneSessionRoleApplication:0:UISceneDelegateClassName RenderTestSceneDelegate' "$app/Contents/Info.plist"
 xcrun clang -fobjc-arc -target arm64-apple-ios17.0-macabi -isysroot "$sdk" \
  -iframework "$sdk/System/iOSSupport/System/Library/Frameworks" \
- -framework UIKit -framework Foundation -framework QuartzCore -framework CoreGraphics -framework MetalKit -framework Metal -framework WeatherKit \
+ -framework UIKit -framework Foundation -framework QuartzCore -framework ImageIO -framework CoreGraphics -framework MetalKit -framework Metal -framework WeatherKit \
  Tests/render-live.m Build/WeatherRuntime.o Build/WeatherService.o Sources/SwiftCall.s -o "$app/Contents/MacOS/RenderTests"
 codesign --force --sign - "$app"
 log="$PWD/Build/test-live-output.log"

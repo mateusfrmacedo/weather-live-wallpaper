@@ -1,4 +1,5 @@
 #import "SceneExporter.h"
+#import "../ShootingStar.h"
 #import <AVFoundation/AVFoundation.h>
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
@@ -56,7 +57,10 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
  NSError *error=nil;
  // A stable entitlement path works for every user's UID. Scene folders stay private.
  NSString *shared=@"/Users/Shared/WeatherWallpaper";
- if(![NSFileManager.defaultManager createDirectoryAtPath:shared withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@01777} error:&error]){[self finish:error];return;}
+ BOOL isDirectory=NO;
+ if([NSFileManager.defaultManager fileExistsAtPath:shared isDirectory:&isDirectory]){
+  if(!isDirectory){[self finish:WWExportError(@"O diretório compartilhado está ocupado por um arquivo.")];return;}
+ }else if(![NSFileManager.defaultManager createDirectoryAtPath:shared withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@01777} error:&error]){[self finish:error];return;}
  if(![NSFileManager.defaultManager createDirectoryAtPath:root withIntermediateDirectories:YES attributes:@{NSFilePosixPermissions:@0700} error:&error]){[self finish:error];return;}
  self.directory=[NSURL fileURLWithPath:[root stringByAppendingPathComponent:NSUUID.UUID.UUIDString] isDirectory:YES];
  if(![NSFileManager.defaultManager createDirectoryAtURL:self.directory withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@0700} error:&error]){[self finish:error];return;}
@@ -116,6 +120,7 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
    CGContextClipToMask(context.CGContext,self.view.bounds,mask.CGImage);
   }
   [[UIImage imageWithCGImage:image] drawInRect:self.view.bounds];
+  [WWShootingStarForView(self.view) drawCurrentFrameInContext:context.CGContext];
  }];
  CGImageRelease(image);CGContextRelease(source);
  if(self.frames==0 && ![UIImagePNGRepresentation(frame) writeToURL:[self.directory URLByAppendingPathComponent:@"poster.png"] atomically:YES]){CGColorSpaceRelease(space);[self finish:WWExportError(@"Não foi possível salvar a imagem estática.")];return;}
@@ -127,7 +132,7 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
  if(target)CGContextRelease(target);CGColorSpaceRelease(space);CVPixelBufferUnlockBaseAddress(pixel,0);
  BOOL appended=target && [self.adaptor appendPixelBuffer:pixel withPresentationTime:CMTimeMake(self.frames,24)];CVPixelBufferRelease(pixel);
  if(!appended){[self finish:self.writer.error ?: WWExportError(@"O codificador rejeitou um quadro.")];return;}
- if(++self.frames<192)return;
+ if(++self.frames<384)return;
  [self.timer invalidate];self.timer=nil;[self.input markAsFinished];[self.writer endSessionAtSourceTime:CMTimeMake(self.frames,24)];
  [self.writer finishWritingWithCompletionHandler:^{dispatch_async(dispatch_get_main_queue(),^{
   if(self.writer.status!=AVAssetWriterStatusCompleted){[self finish:self.writer.error ?: WWExportError(@"O vídeo não foi finalizado.")];return;}

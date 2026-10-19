@@ -38,7 +38,9 @@ Mantenha o app aberto para atualizar o clima. A primeira preparação
 leva alguns segundos. A seleção anterior do papel de parede do sistema
 não é substituída automaticamente.
 
-Novidades 0.3.0: dois modos de animação, configurações compactas,
+Novidades 0.3.1: lua e estrelas com brilho mais sutil, movimento lunar
+atualizado, estrelas nos cantos e estrela cadente em toda a largura.
+Inclui dois modos de animação, configurações compactas,
 botões Liquid Glass e preferência de modo salva.
 O loop nativo é experimental e pode apresentar uma emenda visível.
 Atalho para recuperar os controles: Command + Shift + P.

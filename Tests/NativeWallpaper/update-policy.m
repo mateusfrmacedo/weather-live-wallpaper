@@ -13,6 +13,8 @@ int main(void){@autoreleasepool{
  next=[sunset mutableCopy];next[@"elevation"]=@0;
  NSCAssert(WWNeedsNewScene(sunset,next,300),@"Twilight must update more often");
  NSCAssert(!WWNeedsNewScene(base,base,1799) && WWNeedsNewScene(base,base,1800),@"Bound stale celestial positions");
+ NSMutableDictionary *night=[base mutableCopy];night[@"elevation"]=@(-20);
+ NSCAssert(!WWNeedsNewScene(night,night,299) && WWNeedsNewScene(night,night,300),@"Moon position must refresh every five minutes at night");
  next=[base mutableCopy];next[@"cloudCover"]=@0.7;NSCAssert(WWNeedsNewScene(base,next,600),@"Cloud coverage update");
  NSLog(@"PASS: weather change policy");return 0;
 }}

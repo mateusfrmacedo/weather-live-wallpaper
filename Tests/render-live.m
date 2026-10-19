@@ -28,6 +28,14 @@
 - (void)testUpdate {
  NSArray *conditions=@[@"clear",@"mostlyClear",@"partlyCloudy",@"mostlyCloudy",@"cloudy",@"rain",@"heavyRain",@"thunderstorms",@"snow",@"foggy"];
  NSInteger index=self.testUpdates++;
+ if(index==0){
+  for(NSValue *value in @[[NSValue valueWithCGSize:CGSizeMake(1512,982)],[NSValue valueWithCGSize:CGSizeMake(5120,1440)]]){
+   CGSize size=value.CGSizeValue;WWShootingStarLayer *meteor=[WWShootingStarLayer layerForSize:size];
+   WWMeteorSample start=WWMeteorAt(size,1.01),end=WWMeteorAt(size,2.09);
+   if(!meteor.texture.CGImage || start.center.x<size.width || end.center.x>0 || start.opacity>0.24 || end.opacity>0.24){NSLog(@"FAIL: native shooting-star texture or full-screen route");exit(1);}
+   [meteor setPlaybackPaused:YES];if(!meteor.playbackPaused){NSLog(@"FAIL: shooting star pause");exit(1);}[meteor setPlaybackPaused:NO];
+  }
+ }
  if(index%40==10){
   [self useWallpaper];id scene=self.scene,view=self.weatherView;
   id desktop=[self.desktopBridge valueForKey:@"window"];

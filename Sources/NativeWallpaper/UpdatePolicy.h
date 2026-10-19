@@ -12,5 +12,5 @@ static BOOL WWNeedsNewScene(NSDictionary *previous, NSDictionary *next, NSTimeIn
  if(age>=300 && fabs([next[@"cloudCover"] doubleValue]-[previous[@"cloudCover"] doubleValue])>=0.15)return YES;
  if(age>=300 && fabs([next[@"wind"] doubleValue]-[previous[@"wind"] doubleValue])>=10)return YES;
  // Refresh celestial positions even when elevation is almost unchanged.
- return age>=1800;
+ return age>=(elevation< -0.833 ? 300 : 1800);
 }

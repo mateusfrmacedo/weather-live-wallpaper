@@ -44,7 +44,7 @@
  BOOL continuous=self.continuousWallpaperEnabled;
  self.wallpaper=continuous;[self.desktopBridge setLiveDesktopEnabled:continuous];
  if(!self.exporter.busy && !self.preparingExport){
-  self.paused=!continuous || self.userPaused;[self.scene setPaused:self.paused];[self.scene setIsPlaying:!self.paused];[self.weatherView setRendersContinuously:!self.paused];
+  self.paused=!continuous || self.userPaused;[self.scene setPaused:self.paused];[self.scene setIsPlaying:!self.paused];[self.weatherView setRendersContinuously:!self.paused];[WWShootingStarForView(self.weatherView) setPlaybackPaused:self.paused];
   if(continuous)[self applyRenderingQuality];
  }
  [self rebuildPreferences];

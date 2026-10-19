@@ -20,6 +20,8 @@ plist="$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set CFBundleName $appName" "$plist"
 /usr/libexec/PlistBuddy -c "Set CFBundleDisplayName $appName" "$plist"
 /usr/libexec/PlistBuddy -c 'Set UIApplicationSceneManifest:UISceneConfigurations:UIWindowSceneSessionRoleApplication:0:UISceneDelegateClassName NativeWeatherSceneDelegate' "$plist"
+appVersion=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$plist")
+appBuild=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$plist")
 bridge="$app/Contents/PlugIns/DesktopBridge.bundle"
 /usr/libexec/PlistBuddy -c 'Set NSPrincipalClass NativeDesktopBridge' "$bridge/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set CFBundleIdentifier $identity.DesktopBridge" "$bridge/Contents/Info.plist"
@@ -29,7 +31,7 @@ xcrun clang -fobjc-arc -bundle -target arm64-apple-macos14.0 -isysroot "$sdk" \
 codesign --force --sign - "$bridge"
 xcrun clang -fobjc-arc -target arm64-apple-ios17.0-macabi -isysroot "$sdk" \
  -iframework "$sdk/System/iOSSupport/System/Library/Frameworks" \
- -framework UIKit -framework Foundation -framework QuartzCore -framework CoreGraphics -framework MetalKit -framework Metal -framework WeatherKit -framework AVFoundation -framework CoreVideo -framework CoreMedia \
+ -framework UIKit -framework Foundation -framework QuartzCore -framework ImageIO -framework CoreGraphics -framework MetalKit -framework Metal -framework WeatherKit -framework AVFoundation -framework CoreVideo -framework CoreMedia \
  Sources/NativeWallpaper/PrototypeHost.m Sources/NativeWallpaper/SceneExporter.m \
  Build/WeatherRuntime.o Build/WeatherService.o Sources/SwiftCall.s -o "$app/Contents/MacOS/WeatherWallpaper"
 extension="$app/Contents/Extensions/WeatherWallpaper.appex"
@@ -47,8 +49,8 @@ cat > "$extension/Contents/Info.plist" <<PLIST
 <key>CFBundleSupportedPlatforms</key><array><string>MacOSX</string></array>
 <key>CFBundleDisplayName</key><string>$wallpaperName</string>
 <key>CFBundlePackageType</key><string>XPC!</string>
-<key>CFBundleShortVersionString</key><string>0.3.0</string>
-<key>CFBundleVersion</key><string>7</string>
+<key>CFBundleShortVersionString</key><string>$appVersion</string>
+<key>CFBundleVersion</key><string>$appBuild</string>
 <key>LSMinimumSystemVersion</key><string>27.0</string>
 <key>EXAppExtensionAttributes</key><dict><key>EXExtensionPointIdentifier</key><string>com.apple.wallpaper</string></dict>
 </dict></plist>
@@ -63,7 +65,7 @@ xcrun clang -fobjc-arc -target arm64-apple-macos27.0 -isysroot "$sdk" \
  -c Sources/NativeWallpaper/WallpaperRuntime.m -o Build/WallpaperRuntime.o
 xcrun swiftc -swift-version 5 -application-extension -Xlinker -application_extension -Xlinker -e -Xlinker _NSExtensionMain -target arm64-apple-macos27.0 -sdk "$sdk" -parse-as-library \
  -import-objc-header Sources/NativeWallpaper/WallpaperPrivate.h \
- -framework AppKit -framework QuartzCore -framework AVFoundation -framework IOSurface -framework CoreImage -framework ExtensionFoundation \
+ -framework AppKit -framework QuartzCore -framework ImageIO -framework AVFoundation -framework IOSurface -framework CoreImage -framework ExtensionFoundation \
  Sources/NativeWallpaper/*.swift Build/WallpaperRuntime.o -o "$extension/Contents/MacOS/WeatherWallpaperExtension"
 codesign --force --sign - --entitlements Build/native-wallpaper.entitlements "$extension"
 codesign --force --sign - "$app"

@@ -38,11 +38,12 @@ int main(void) {@autoreleasepool {
   if(result[@"error"] || ![result[@"cloudKind"] isEqual:altitude]){NSLog(@"FAILED cloud altitude %@ %@",altitude,result);return 5;}
   count++;
  }}
- // Identical automatic refreshes must not multiply the star reduction again.
+ // Identical automatic refreshes must preserve native brightness and size.
  NSDictionary *baseline=nil;
  for(int update=0;update<3;update++) {@autoreleasepool {
   NSDictionary *result=[NSClassFromString(@"WeatherRuntime") applyEffect:effect condition:@"clear" elevation:-25 cloudCover:0 wind:12 size:CGSizeMake(1512,982) isPM:YES timeZone:@"America/Sao_Paulo"];
   if(result[@"error"] || !result[@"starCount"] || !result[@"starOpacity"])return 8;
+  if([result[@"starOpacity"] doubleValue]>[result[@"nativeStarOpacity"] doubleValue] || ![result[@"starSize"] isEqual:result[@"nativeStarSize"]])return 22;
   if(baseline)for(NSString *key in @[@"starCount",@"brightStarCount",@"starOpacity"])if(![baseline[key] isEqual:result[key]]){NSLog(@"FAILED repeated star update %@",key);return 9;}
   baseline=result;count++;
  }}
@@ -74,6 +75,16 @@ int main(void) {@autoreleasepool {
  if([moons[0] isEqual:moons[1]] && [moons[1] isEqual:moons[2]])return 17;
  if([solarX[0] doubleValue]>=0 || [solarX[2] doubleValue]<=0 || fabs([solarX[1] doubleValue])>1)return 19;
  if([solarY[1] doubleValue]<=[solarY[0] doubleValue] || [solarY[1] doubleValue]<=[solarY[2] doubleValue])return 20;
+ // At night, the actual native moon trajectory must advance with the clock.
+ double previousProgress=-1;
+ for(NSString *timestamp in @[@"2026-10-19T22:00:00Z",@"2026-10-20T00:00:00Z",@"2026-10-20T02:00:00Z"]){
+  NSDate *date=[formatter dateFromString:timestamp];
+  NSMutableDictionary *details=[[NSClassFromString(@"WeatherService") lightingForLocation:location date:date] mutableCopy];[details addEntriesFromDictionary:location];
+  NSDictionary *result=[NSClassFromString(@"WeatherRuntime") applyEffect:effect condition:@"clear" elevation:[details[@"elevation"] doubleValue] cloudCover:0 wind:5 size:CGSizeMake(1920,1080) isPM:YES timeZone:@"America/Sao_Paulo" details:details];
+  double progress=[result[@"moonRiseToSet"] doubleValue];
+  if(result[@"error"] || progress<=previousProgress || [result[@"moonElevation"] doubleValue]<=0)return 23;
+  previousProgress=progress;count++;
+ }
  // Precipitation must fill landscape and ultrawide screens without thinning out.
  NSDictionary *portrait=nil;
  CGSize screenSizes[]={CGSizeMake(900,1200),CGSizeMake(1512,982),CGSizeMake(1920,1080),CGSizeMake(3440,1440),CGSizeMake(5120,1440)};

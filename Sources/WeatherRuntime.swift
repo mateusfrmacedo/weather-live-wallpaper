@@ -204,18 +204,20 @@ func swiftMoon(_ function:UnsafeRawPointer,_ object:UnsafeRawPointer,_ date:Unsa
   _openExistential(configOptionalType,do:destroy)
   guard var config=Mirror(reflecting:optional).children.first?.value else {return ["error":"No configuration for this condition"]}
 
-  // Calibrate the original star emitters for a full desktop. Tune a fresh config
-  // before applyUpdate so repeated solar refreshes never compound attenuation.
+  // Keep the native textures, phase shading and twinkle. On a desktop the
+  // bright-star bloom dominates a much larger unobstructed area than Weather's
+  // card layout; bound only that glow, without whitening the Moon's surface.
   var starValues=Dictionary(uniqueKeysWithValues:Mirror(reflecting:config).children.compactMap { child -> (String,Any)? in child.label.map {($0,child.value)} })
-  for key in ["starParticleCount","starBrightParticleCount"] {
-   if let count=starValues[key] as? Int {starValues[key]=Int((Double(count) * (key=="starParticleCount" ? 0.55 : 0.30)).rounded())}
-  }
-  for (key,multiplier) in [("starOpacity",Float(0.65)),("starTwinkleAmount",0.50),("starBrightTwinkleAmount",0.40)] {
-   if let value=starValues[key] as? Float {starValues[key]=value * multiplier}
-  }
-  for key in ["starSize","starBrightSize"] {
-   if let value=starValues[key] as? SIMD2<Float> {starValues[key]=value * (key=="starSize" ? 0.82 : 0.65)}
-  }
+  let nativeStarOpacity=starValues["starOpacity"]!
+  let nativeStarSize=starValues["starSize"]!
+  let nativeStarCount=starValues["starParticleCount"]!
+  if let bloom=starValues["bloomIntensity"] as? Float {starValues["bloomIntensity"]=min(bloom,0.18)}
+  if let opacity=starValues["starOpacity"] as? Float {starValues["starOpacity"]=opacity*0.65}
+  if let count=starValues["starBrightParticleCount"] as? Int {starValues["starBrightParticleCount"]=Int((Float(count)*0.35).rounded())}
+  if let intensity=starValues["moonLightIntensity"] as? Float {starValues["moonLightIntensity"]=intensity*0.35}
+  if let haze=starValues["starCloudsOpacity"] as? Float {starValues["starCloudsOpacity"]=haze*0.25}
+  if let radius=starValues["moonLightRadius"] as? Float {starValues["moonLightRadius"]=radius*0.60}
+  if let color=starValues["moonColor"] as? SIMD4<Float> {starValues["moonColor"]=SIMD4<Float>(color.x*0.75,color.y*0.75,color.z*0.75,color.w)}
   // Weather's precipitation emitter has a fixed width. The camera exposes more
   // sky on landscape displays, so expand emission and preserve particle density.
   // Always start from the native configuration to avoid compounding on refresh.
@@ -233,8 +235,6 @@ func swiftMoon(_ function:UnsafeRawPointer,_ object:UnsafeRawPointer,_ date:Unsa
    starValues["sunRayPositionFollowsTimeOfDay"]=false
    starValues["sunRayStartPosition"]=SIMD3<Float>(Float(18*sin(hourAngle * .pi/180)),Float(-18+38*sin(elevation * .pi/180)),sun.z)
   }
-  // Apply the decorative layer change with the rest of the configuration.
-  starValues["starCloudsOpacity"]=Float(0)
   let desktopConfig=Buffer(configType,starValues)
   config=read(configType,desktopConfig.pointer)
 
@@ -299,7 +299,7 @@ func swiftMoon(_ function:UnsafeRawPointer,_ object:UnsafeRawPointer,_ date:Unsa
   }
   _openExistential(sky,do:applyGradient)
   previousEffect=effect;previousConfiguration=config
-  return ["precipitationWidthScale":precipitationWidthScale,"particleEmitterWidth":starValues["particleEmitterWidth"]!,"rainParticleCount":starValues["rainBGParticleCount"]!,"condition":condition,"elevation":elevation,"renderer":"Apple WeatherUI + VFX", "configuration":"Apple original", "cloudKind":String(describing:altitude),"gradientLayer":background,"moonData":moonDescription,"sunPosition":String(describing:starValues["sunRayStartPosition"]!),"sunX":(starValues["sunRayStartPosition"] as? SIMD3<Float>)?.x ?? 0,"sunY":(starValues["sunRayStartPosition"] as? SIMD3<Float>)?.y ?? 0,"moonElevation":starValues["moonElevation"]!,"moonRiseToSet":starValues["moonRiseToSet"]!,"sunAlpha":(starValues["sunSpikeBallColor"] as? SIMD4<Float>)?.w ?? 0,"moonImage":starValues["moonImageName"]!,"starCount":starValues["starParticleCount"]!,"brightStarCount":starValues["starBrightParticleCount"]!,"starOpacity":starValues["starOpacity"]!]
+  return ["nativeStarCount":nativeStarCount,"nativeStarOpacity":nativeStarOpacity,"nativeStarSize":String(describing:nativeStarSize),"starSize":String(describing:starValues["starSize"]!),"precipitationWidthScale":precipitationWidthScale,"particleEmitterWidth":starValues["particleEmitterWidth"]!,"rainParticleCount":starValues["rainBGParticleCount"]!,"condition":condition,"elevation":elevation,"renderer":"Apple WeatherUI + VFX", "configuration":"Apple original", "cloudKind":String(describing:altitude),"gradientLayer":background,"moonData":moonDescription,"sunPosition":String(describing:starValues["sunRayStartPosition"]!),"sunX":(starValues["sunRayStartPosition"] as? SIMD3<Float>)?.x ?? 0,"sunY":(starValues["sunRayStartPosition"] as? SIMD3<Float>)?.y ?? 0,"moonElevation":starValues["moonElevation"]!,"moonRiseToSet":starValues["moonRiseToSet"]!,"sunAlpha":(starValues["sunSpikeBallColor"] as? SIMD4<Float>)?.w ?? 0,"moonImage":starValues["moonImageName"]!,"starCount":starValues["starParticleCount"]!,"brightStarCount":starValues["starBrightParticleCount"]!,"starOpacity":starValues["starOpacity"]!]
  }
 }
 

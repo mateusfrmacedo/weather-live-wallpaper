@@ -1,3 +1,5 @@
+#import "SkyGeometry.h"
+#import "ShootingStar.m"
 #import "PrivateVFX.h"
 #import <dlfcn.h>
 #import <Metal/MTLPixelFormat.h>
@@ -128,9 +130,12 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  if(self.location){details[@"latitude"]=self.location[@"latitude"];details[@"longitude"]=self.location[@"longitude"];}
  NSDictionary *r=[NSClassFromString(@"WeatherRuntime") applyEffect:self.effect condition:self.condition elevation:e cloudCover:self.live ? [self.liveWeather[@"cloudCover"] doubleValue] : cloudCover(self.condition) wind:self.live ? [self.liveWeather[@"wind"] doubleValue] : 12 size:self.view.bounds.size isPM:self.live ? [self.liveWeather[@"isPM"] boolValue] : self.timeControl.selectedSegmentIndex==1 timeZone:self.liveWeather[@"timeZone"] ?: NSTimeZone.localTimeZone.name details:details];
  if(r[@"error"]){self.weatherView=previousView;self.scene=previousScene;self.effect=previousEffect;[self setStatus:r[@"error"]];return;}
+ WWShootingStarLayer *meteor=[r[@"starOpacity"] doubleValue]>0 ? [WWShootingStarLayer layerForSize:self.view.bounds.size] : nil;
+ // Change emitter geometry before makeView starts VFX's rendering thread.
+ if(meteor)WWFitSkyToDisplay(self.scene,self.effect,self.view.bounds.size,YES);
  self.weatherView=[NSClassFromString(@"WeatherRuntime") makeView:self.effect];self.weatherView.frame=self.view.bounds;self.weatherView.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
- // VFX shaders emit linear RGB. Encode to sRGB when writing the display target.
- [self.weatherView setPixelFormat:MTLPixelFormatBGRA8Unorm_sRGB];
+ if(meteor){[self.weatherView.layer addSublayer:meteor];[meteor setPlaybackPaused:self.paused];}
+ // Keep WeatherUI’s own output format and color handling.
  self.weatherView.backgroundColor=UIColor.clearColor;self.weatherView.opaque=NO;
  if([self.weatherView isKindOfClass:MTKView.class])((MTKView *)self.weatherView).clearColor=MTLClearColorMake(0,0,0,0);
  [self applyRenderingQuality];
@@ -143,18 +148,9 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  [self.scene setPaused:self.paused];[self.scene setIsPlaying:!self.paused];
  [self.weatherView setRendersContinuously:!self.paused];
  if(self.wallpaper)[self.weatherView _allowGPUBackgroundExecution];
- // Weather's night sky recedes toward the horizon. Keep the gradient below
- // the VFX view intact while fading stars and thin cloud effects above it.
- BOOL starry=[@[@"clear",@"mostlyClear",@"partlyCloudy",@"mostlyCloudy"] containsObject:self.condition];
- CGFloat fade=starry ? MIN(1,MAX(0,-e/6.0)) : 0;
- if(fade>0) {
-  if(!self.nightSkyMask)self.nightSkyMask=[CAGradientLayer layer];
-  [CATransaction begin];[CATransaction setDisableActions:YES];self.nightSkyMask.frame=self.weatherView.bounds;
-  self.nightSkyMask.startPoint=CGPointMake(0.5,0);self.nightSkyMask.endPoint=CGPointMake(0.5,1);
-  self.nightSkyMask.locations=@[@0,@0.18,@0.40,@0.62,@0.80,@1];
-  NSMutableArray *colors=[NSMutableArray new];for(NSNumber *alpha in @[@1,@0.95,@0.55,@0.14,@0,@0])[colors addObject:(id)[UIColor colorWithWhite:1 alpha:1-fade*(1-alpha.doubleValue)].CGColor];
-  self.nightSkyMask.colors=colors;self.weatherView.layer.mask=self.nightSkyMask;[CATransaction commit];
- } else self.weatherView.layer.mask=nil;
+ // Keep the complete native sky: a whole-view mask also attenuates the moon
+ // and removes stars at the bottom corners of landscape displays.
+ self.weatherView.layer.mask=nil;self.nightSkyMask=nil;
  CAGradientLayer *gradient=r[@"gradientLayer"];[CATransaction begin];[CATransaction setDisableActions:YES];self.skyGradient.colors=gradient.colors;self.skyGradient.locations=gradient.locations;self.skyGradient.startPoint=gradient.startPoint;self.skyGradient.endPoint=gradient.endPoint;[CATransaction commit];
  self.conditionLabel.text=conditionTitle(self.condition);UIButtonConfiguration *config=[self.sceneButton.configuration copy];config.title=conditionTitle(self.condition);self.sceneButton.configuration=config;[self setStatus:@""];NSLog(@"Rendered condition=%@ elevation=%.2f live=%d",self.condition,e,self.live);
 }
@@ -187,7 +183,8 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  if(self.liveWeather)[self displayCurrentWeather];[self refreshWeather];
 }
 - (void)automaticTick {
- if(!self.automaticWeather || !self.location)return;
+ if(!self.automaticWeather){if(self.location && self.timeControl.selectedSegmentIndex==2)[self applyWeather];return;}
+ if(!self.location)return;
  if(self.liveWeather)[self displayCurrentWeather];
  if(!self.nextWeatherRefresh || [self.nextWeatherRefresh timeIntervalSinceNow]<=0)[self refreshWeather];
 }
@@ -229,7 +226,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
 - (void)showPreferences {[self.desktopBridge showPreferences];}
 - (void)useWallpaper {if(!self.ready || !self.desktopBridge)return;self.panel.hidden=YES;[self.weatherView _allowGPUBackgroundExecution];[self.desktopBridge setWallpaper:YES];self.wallpaper=YES;}
 - (void)showPreview {self.panel.hidden=NO;[self.desktopBridge setWallpaper:NO];self.wallpaper=NO;}
-- (void)togglePause {self.paused=!self.paused;[self.scene setPaused:self.paused];[self.weatherView setRendersContinuously:!self.paused];UIButtonConfiguration *c=[self.pauseButton.configuration copy];c.title=self.paused ? @"Continuar animação" : @"Pausar animação";self.pauseButton.configuration=c;[self rebuildPreferences];}
+- (void)togglePause {self.paused=!self.paused;[self.scene setPaused:self.paused];[self.weatherView setRendersContinuously:!self.paused];UIButtonConfiguration *c=[self.pauseButton.configuration copy];c.title=self.paused ? @"Continuar animação" : @"Pausar animação";self.pauseButton.configuration=c;[WWShootingStarForView(self.weatherView) setPlaybackPaused:self.paused];[self rebuildPreferences];}
 - (void)dealloc {[self.refreshTimer invalidate];[NSNotificationCenter.defaultCenter removeObserver:self];}
 @end
 @interface WeatherSceneDelegate : UIResponder <UIWindowSceneDelegate>
