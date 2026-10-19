@@ -216,6 +216,16 @@ func swiftMoon(_ function:UnsafeRawPointer,_ object:UnsafeRawPointer,_ date:Unsa
   for key in ["starSize","starBrightSize"] {
    if let value=starValues[key] as? SIMD2<Float> {starValues[key]=value * (key=="starSize" ? 0.82 : 0.65)}
   }
+  // Weather's precipitation emitter has a fixed width. The camera exposes more
+  // sky on landscape displays, so expand emission and preserve particle density.
+  // Always start from the native configuration to avoid compounding on refresh.
+  let precipitationWidthScale=Float(max(1,size.width / max(1,size.height)))
+  if let width=starValues["particleEmitterWidth"] as? Float {
+   starValues["particleEmitterWidth"]=width * precipitationWidthScale
+  }
+  for key in ["rainFGParticleCount","rainBGParticleCount","snowFGParticleCount","snowBGParticleCount","sleetFGParticleCount","sleetBGParticleCount","hailParticleCount"] {
+   if let count=starValues[key] as? Float {starValues[key]=count * precipitationWidthScale}
+  }
   // Project the solar hour angle and altitude into the desktop's visible sky.
   // WeatherUI's default portrait composition can crop the sun out entirely.
   if elevation>0, ["clear","mostlyClear","partlyCloudy"].contains(condition),let sun=starValues["sunRayStartPosition"] as? SIMD3<Float> {
@@ -289,7 +299,7 @@ func swiftMoon(_ function:UnsafeRawPointer,_ object:UnsafeRawPointer,_ date:Unsa
   }
   _openExistential(sky,do:applyGradient)
   previousEffect=effect;previousConfiguration=config
-  return ["condition":condition,"elevation":elevation,"renderer":"Apple WeatherUI + VFX", "configuration":"Apple original", "cloudKind":String(describing:altitude),"gradientLayer":background,"moonData":moonDescription,"sunPosition":String(describing:starValues["sunRayStartPosition"]!),"sunX":(starValues["sunRayStartPosition"] as? SIMD3<Float>)?.x ?? 0,"sunY":(starValues["sunRayStartPosition"] as? SIMD3<Float>)?.y ?? 0,"moonElevation":starValues["moonElevation"]!,"moonRiseToSet":starValues["moonRiseToSet"]!,"sunAlpha":(starValues["sunSpikeBallColor"] as? SIMD4<Float>)?.w ?? 0,"moonImage":starValues["moonImageName"]!,"starCount":starValues["starParticleCount"]!,"brightStarCount":starValues["starBrightParticleCount"]!,"starOpacity":starValues["starOpacity"]!]
+  return ["precipitationWidthScale":precipitationWidthScale,"particleEmitterWidth":starValues["particleEmitterWidth"]!,"rainParticleCount":starValues["rainBGParticleCount"]!,"condition":condition,"elevation":elevation,"renderer":"Apple WeatherUI + VFX", "configuration":"Apple original", "cloudKind":String(describing:altitude),"gradientLayer":background,"moonData":moonDescription,"sunPosition":String(describing:starValues["sunRayStartPosition"]!),"sunX":(starValues["sunRayStartPosition"] as? SIMD3<Float>)?.x ?? 0,"sunY":(starValues["sunRayStartPosition"] as? SIMD3<Float>)?.y ?? 0,"moonElevation":starValues["moonElevation"]!,"moonRiseToSet":starValues["moonRiseToSet"]!,"sunAlpha":(starValues["sunSpikeBallColor"] as? SIMD4<Float>)?.w ?? 0,"moonImage":starValues["moonImageName"]!,"starCount":starValues["starParticleCount"]!,"brightStarCount":starValues["starBrightParticleCount"]!,"starOpacity":starValues["starOpacity"]!]
  }
 }
 

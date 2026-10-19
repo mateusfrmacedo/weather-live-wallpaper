@@ -74,6 +74,17 @@ int main(void) {@autoreleasepool {
  if([moons[0] isEqual:moons[1]] && [moons[1] isEqual:moons[2]])return 17;
  if([solarX[0] doubleValue]>=0 || [solarX[2] doubleValue]<=0 || fabs([solarX[1] doubleValue])>1)return 19;
  if([solarY[1] doubleValue]<=[solarY[0] doubleValue] || [solarY[1] doubleValue]<=[solarY[2] doubleValue])return 20;
+ // Precipitation must fill landscape and ultrawide screens without thinning out.
+ NSDictionary *portrait=nil;
+ CGSize screenSizes[]={CGSizeMake(900,1200),CGSizeMake(1512,982),CGSizeMake(1920,1080),CGSizeMake(3440,1440),CGSizeMake(5120,1440)};
+ for(int screen=0;screen<5;screen++) {
+  CGSize size=screenSizes[screen];
+  NSDictionary *result=[NSClassFromString(@"WeatherRuntime") applyEffect:effect condition:@"rain" elevation:35 cloudCover:0.95 wind:12 size:size isPM:NO timeZone:@"America/Sao_Paulo"];
+  if(!portrait)portrait=result;
+  double scale=MAX(1,size.width/size.height);
+  if(result[@"error"] || fabs([result[@"particleEmitterWidth"] doubleValue]/[portrait[@"particleEmitterWidth"] doubleValue]-scale)>0.001 || fabs([result[@"rainParticleCount"] doubleValue]/[portrait[@"rainParticleCount"] doubleValue]-scale)>0.001){NSLog(@"FAILED precipitation coverage %@",result);return 21;}
+  count++;
+ }
  // Longitude must move solar noon across the UTC date boundary correctly.
  NSDictionary *west=[NSClassFromString(@"WeatherService") lightingForLocation:@{@"latitude":@0,@"longitude":@(-170)} date:[formatter dateFromString:@"2026-10-18T23:50:00Z"]];
  if(![west[@"isPM"] boolValue] || ![west[@"isDaylight"] boolValue])return 18;
