@@ -28,7 +28,14 @@
  if(index%20==0)self.view.bounds=CGRectMake(0,0,index%40 ? 1200 : 900,index%40 ? 700 : 850);
  [self applyWeather];
  if(index%50==0){[self togglePause];[self togglePause];NSLog(@"Live render updates: %ld",(long)index);}
- if(self.testUpdates>=200){NSLog(@"PASS: 200 updates with active Metal rendering, lunar data, resizing, pause/resume and desktop mode.");exit(0);}
+ if(self.testUpdates>=200){
+  [self.testTimer invalidate];self.condition=@"rain";NSMutableDictionary *weather=[self.liveWeather mutableCopy];weather[@"elevation"]=@35;weather[@"cloudCover"]=@0.95;self.liveWeather=weather;[self applyWeather];
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW,3*NSEC_PER_SEC),dispatch_get_main_queue(),^{
+   NSInteger particles=[self.scene particleCount];NSLog(@"Live renderer playing=%d particles=%ld",[self.scene isPlaying],(long)particles);
+   if(![self.scene isPlaying] || particles<=0){NSLog(@"FAIL: renderer stopped producing particles");exit(1);}
+   NSLog(@"PASS: 200 updates with active Metal rendering, lunar data, resizing, pause/resume and desktop mode.");exit(0);
+  });
+ }
 }
 @end
 @interface RenderTestSceneDelegate : UIResponder <UIWindowSceneDelegate>

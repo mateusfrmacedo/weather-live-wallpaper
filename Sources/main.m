@@ -36,7 +36,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
 @property(nonatomic) BOOL live,paused,wallpaper,ready,requesting;
 @property(nonatomic) NSUInteger requestGeneration;
 @property(nonatomic) CGSize renderedSize;
-@property(nonatomic) BOOL automaticWeather;
+@property(nonatomic) BOOL automaticWeather,applyingWeather;
 @property(nonatomic,strong) NSDate *nextWeatherRefresh;
 @end
 @implementation WeatherController
@@ -55,25 +55,22 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  NSDictionary *cache=[defaults dictionaryForKey:@"LastWeatherCache"];
  if([cache[@"locationID"] isEqual:[self locationIdentifier]] && self.automaticWeather)self.liveWeather=cache[@"weather"];
  [self buildControls];
- if(!dlopen("/System/iOSSupport/System/Library/PrivateFrameworks/WeatherUI.framework/WeatherUI",RTLD_NOW) || ![NSClassFromString(@"WeatherRuntime") isSupported]) {[self setStatus:@"Este renderizador precisa do WeatherUI do macOS 27. A versão instalada não é compatível."];return;}
- NSString *root=@"/System/iOSSupport/System/Library/PrivateFrameworks/WeatherUI.framework/Resources";
- id options=[NSClassFromString(@"VFXSceneLoadOptions") new];[options setValue:@YES forKey:@"loadBindingsMetadata"];
- [options setValue:[NSURL fileURLWithPath:[root stringByAppendingPathComponent:@"default.metallib"]] forKey:@"metalLibraryURL"];
- NSError *error=nil;self.scene=[[NSClassFromString(@"VFX.VFXScene") alloc] initWithContentsOf:[NSURL fileURLWithPath:[root stringByAppendingPathComponent:@"VFX/WeatherV136_Default_Background.vfx"]] options:options error:&error];
- if(!self.scene){[self setStatus:error.localizedDescription ?: @"Não foi possível carregar a cena do Tempo."];return;}
- self.effect=[self.scene addEffectWithEffectID:0];if(!self.effect){[self setStatus:@"O formato da cena do Tempo mudou."];return;}
- self.weatherView=[NSClassFromString(@"WeatherRuntime") makeView:self.effect];self.weatherView.frame=self.view.bounds;self.weatherView.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
- // VFX shaders emit linear RGB. Encode to sRGB when writing the display target.
- [self.weatherView setPixelFormat:MTLPixelFormatBGRA8Unorm_sRGB];
- self.weatherView.backgroundColor=UIColor.clearColor;self.weatherView.opaque=NO;
- if([self.weatherView isKindOfClass:MTKView.class])((MTKView *)self.weatherView).clearColor=MTLClearColorMake(0,0,0,0);
  self.skyGradient=[CAGradientLayer layer];self.skyGradient.frame=self.view.bounds;
- [self applyRenderingQuality];[self.weatherView setRendersContinuously:YES];[self.scene setIsPlaying:YES];
- [self.view insertSubview:self.weatherView atIndex:0];[self.view.layer insertSublayer:self.skyGradient atIndex:0];self.ready=YES;[self applyWeather];
+ [self.view.layer insertSublayer:self.skyGradient atIndex:0];self.ready=YES;[self applyWeather];
  __weak typeof(self) weakSelf=self;
  self.refreshTimer=[NSTimer scheduledTimerWithTimeInterval:60 repeats:YES block:^(NSTimer *timer){[weakSelf automaticTick];}];self.refreshTimer.tolerance=5;
  [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(applyRenderingQuality) name:NSProcessInfoPowerStateDidChangeNotification object:nil];
  if(self.location){self.cityField.text=self.location[@"name"];if(self.liveWeather)[self displayCurrentWeather];if(self.automaticWeather)[self refreshWeather];}
+}
+- (BOOL)loadRenderer {
+ if(!dlopen("/System/iOSSupport/System/Library/PrivateFrameworks/WeatherUI.framework/WeatherUI",RTLD_NOW) || ![NSClassFromString(@"WeatherRuntime") isSupported]) {[self setStatus:@"Este renderizador precisa do WeatherUI do macOS 27. A versão instalada não é compatível."];return NO;}
+ NSString *root=@"/System/iOSSupport/System/Library/PrivateFrameworks/WeatherUI.framework/Resources";
+ id options=[NSClassFromString(@"VFXSceneLoadOptions") new];[options setValue:@YES forKey:@"loadBindingsMetadata"];
+ [options setValue:[NSURL fileURLWithPath:[root stringByAppendingPathComponent:@"default.metallib"]] forKey:@"metalLibraryURL"];
+ NSError *error=nil;self.scene=[[NSClassFromString(@"VFX.VFXScene") alloc] initWithContentsOf:[NSURL fileURLWithPath:[root stringByAppendingPathComponent:@"VFX/WeatherV136_Default_Background.vfx"]] options:options error:&error];
+ if(!self.scene){[self setStatus:error.localizedDescription ?: @"Não foi possível carregar a cena do Tempo."];return NO;}
+ self.effect=[self.scene addEffectWithEffectID:0];if(!self.effect){[self setStatus:@"O formato da cena do Tempo mudou."];return NO;}
+ return YES;
 }
 - (void)buildControls {
  self.panel=[[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark]];self.panel.translatesAutoresizingMaskIntoConstraints=NO;self.panel.layer.cornerRadius=24;self.panel.clipsToBounds=YES;self.panel.layer.borderWidth=0.5;self.panel.layer.borderColor=[UIColor colorWithWhite:1 alpha:0.2].CGColor;[self.view addSubview:self.panel];
@@ -113,18 +110,34 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
 - (void)selectCondition:(NSString *)c {self.live=NO;self.automaticWeather=NO;[NSUserDefaults.standardUserDefaults setBool:NO forKey:@"AutomaticWeatherEnabled"];self.requestGeneration++;self.requesting=NO;self.condition=c;self.timeControl.enabled=YES;self.cityLabel.text=@"Prévia do clima";self.temperatureLabel.text=@"—°";[self applyWeather];[self buildSceneMenu];[self rebuildPreferences];}
 - (void)timeChanged {if(!self.live)[self applyWeather];}
 - (void)applyWeather {
- if(!self.ready)return;self.renderedSize=self.view.bounds.size;[CATransaction begin];[CATransaction setDisableActions:YES];self.skyGradient.frame=self.view.bounds;[CATransaction commit];double e=self.live ? [self.liveWeather[@"elevation"] doubleValue] : (self.timeControl.selectedSegmentIndex==0 ? 35 : self.timeControl.selectedSegmentIndex==1 ? 1 : -25);
+ if(!self.ready || self.applyingWeather)return;
+ self.applyingWeather=YES;
+ @try {[self replaceRenderer];}
+ @finally {self.applyingWeather=NO;}
+}
+- (void)replaceRenderer {
+ UIView *previousView=self.weatherView;id previousScene=self.scene,previousEffect=self.effect;
+ if(![self loadRenderer]){self.weatherView=previousView;self.scene=previousScene;self.effect=previousEffect;return;}
+ self.renderedSize=self.view.bounds.size;[CATransaction begin];[CATransaction setDisableActions:YES];self.skyGradient.frame=self.view.bounds;[CATransaction commit];double e=self.live ? [self.liveWeather[@"elevation"] doubleValue] : (self.timeControl.selectedSegmentIndex==0 ? 35 : self.timeControl.selectedSegmentIndex==1 ? 1 : -25);
  if(!self.live && NSProcessInfo.processInfo.environment[@"WEATHER_ELEVATION"])e=[NSProcessInfo.processInfo.environment[@"WEATHER_ELEVATION"] doubleValue];
  NSMutableDictionary *details=self.live ? [self.liveWeather mutableCopy] : [NSMutableDictionary new];
  if(self.location){details[@"latitude"]=self.location[@"latitude"];details[@"longitude"]=self.location[@"longitude"];}
- NSDictionary *r;
- // Stop and join VFX's simulation before changing its graph or parameters.
- // A scene transaction alone does not stop the runtime's cached pointer reads.
- [self.weatherView setRendersContinuously:NO];[self.scene stopRuntimeThread];
- [self.weatherView lock];
- @try {r=[NSClassFromString(@"WeatherRuntime") applyEffect:self.effect condition:self.condition elevation:e cloudCover:self.live ? [self.liveWeather[@"cloudCover"] doubleValue] : cloudCover(self.condition) wind:self.live ? [self.liveWeather[@"wind"] doubleValue] : 12 size:self.view.bounds.size isPM:self.live ? [self.liveWeather[@"isPM"] boolValue] : self.timeControl.selectedSegmentIndex==1 timeZone:self.liveWeather[@"timeZone"] ?: NSTimeZone.localTimeZone.name details:details];}
- @finally {[self.weatherView unlock];[self.scene startRuntimeThread];[self.weatherView setRendersContinuously:!self.paused];}
- if(r[@"error"]){[self setStatus:r[@"error"]];return;}
+ NSDictionary *r=[NSClassFromString(@"WeatherRuntime") applyEffect:self.effect condition:self.condition elevation:e cloudCover:self.live ? [self.liveWeather[@"cloudCover"] doubleValue] : cloudCover(self.condition) wind:self.live ? [self.liveWeather[@"wind"] doubleValue] : 12 size:self.view.bounds.size isPM:self.live ? [self.liveWeather[@"isPM"] boolValue] : self.timeControl.selectedSegmentIndex==1 timeZone:self.liveWeather[@"timeZone"] ?: NSTimeZone.localTimeZone.name details:details];
+ if(r[@"error"]){self.weatherView=previousView;self.scene=previousScene;self.effect=previousEffect;[self setStatus:r[@"error"]];return;}
+ self.weatherView=[NSClassFromString(@"WeatherRuntime") makeView:self.effect];self.weatherView.frame=self.view.bounds;self.weatherView.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
+ // VFX shaders emit linear RGB. Encode to sRGB when writing the display target.
+ [self.weatherView setPixelFormat:MTLPixelFormatBGRA8Unorm_sRGB];
+ self.weatherView.backgroundColor=UIColor.clearColor;self.weatherView.opaque=NO;
+ if([self.weatherView isKindOfClass:MTKView.class])((MTKView *)self.weatherView).clearColor=MTLClearColorMake(0,0,0,0);
+ [self applyRenderingQuality];
+ // A running VFX graph caches raw parameter pointers. Build the next scene
+ // offscreen, then swap views instead of changing storage under that graph.
+ [previousView setRendersContinuously:NO];[previousScene stopRuntimeThread];[previousScene setIsPlaying:NO];
+ [previousView setScene:nil];[previousView removeFromSuperview];
+ [self.view insertSubview:self.weatherView atIndex:0];
+ [self.scene setPaused:self.paused];[self.scene setIsPlaying:!self.paused];
+ [self.weatherView setRendersContinuously:!self.paused];
+ if(self.wallpaper)[self.weatherView _allowGPUBackgroundExecution];
  // Weather's night sky recedes toward the horizon. Keep the gradient below
  // the VFX view intact while fading stars and thin cloud effects above it.
  BOOL starry=[@[@"clear",@"mostlyClear",@"partlyCloudy",@"mostlyCloudy"] containsObject:self.condition];
