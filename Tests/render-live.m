@@ -6,6 +6,7 @@
 @interface RenderTestController : WeatherController
 @property(nonatomic) NSInteger testUpdates;
 @property(nonatomic,strong) NSTimer *testTimer;
+@property(nonatomic,strong) id firstSettingsWindow;
 @end
 @implementation RenderTestController
 - (void)viewDidAppear:(BOOL)animated {
@@ -20,7 +21,16 @@
 - (void)testUpdate {
  NSArray *conditions=@[@"clear",@"mostlyClear",@"partlyCloudy",@"mostlyCloudy",@"cloudy",@"rain",@"heavyRain",@"thunderstorms",@"snow",@"foggy"];
  NSInteger index=self.testUpdates++;
- if(index%40==10)[self useWallpaper];
+ if(index%40==10){
+  [self useWallpaper];id scene=self.scene,view=self.weatherView;
+  id desktop=[self.desktopBridge valueForKey:@"window"];
+  NSValue *frame=[desktop valueForKey:@"frame"];NSNumber *level=[desktop valueForKey:@"level"];
+  [self showPreferences];id settings=[self.desktopBridge valueForKey:@"settingsWindow"];
+  if(!self.wallpaper || ![[self.desktopBridge valueForKey:@"wallpaper"] boolValue] || settings==desktop || ![[settings valueForKey:@"visible"] boolValue] || self.scene!=scene || self.weatherView!=view || ![frame isEqual:[desktop valueForKey:@"frame"]] || ![level isEqual:[desktop valueForKey:@"level"]]){NSLog(@"FAIL: preferences moved or replaced the wallpaper");exit(1);}
+  if(self.firstSettingsWindow && self.firstSettingsWindow!=settings){NSLog(@"FAIL: duplicate settings window");exit(1);}
+  self.firstSettingsWindow=settings;[settings performSelector:NSSelectorFromString(@"close")];
+  if(!self.wallpaper || ![[self.desktopBridge valueForKey:@"wallpaper"] boolValue]){NSLog(@"FAIL: closing preferences stopped the wallpaper");exit(1);}
+ }
  if(index%40==20)[self showPreview];
  self.live=YES;self.condition=conditions[(index/5)%conditions.count];
  self.location=@{@"name":@"Render test",@"latitude":@(-20.18222),@"longitude":@(-49.35139)};
@@ -34,7 +44,7 @@
   dispatch_after(dispatch_time(DISPATCH_TIME_NOW,3*NSEC_PER_SEC),dispatch_get_main_queue(),^{
    NSInteger particles=[self.scene particleCount];NSLog(@"Live renderer playing=%d particles=%ld",[self.scene isPlaying],(long)particles);
    if(![self.scene isPlaying] || particles<=0){NSLog(@"FAIL: renderer stopped producing particles");exit(1);}
-   NSLog(@"PASS: 200 updates with active Metal rendering, lunar data, resizing, pause/resume and desktop mode.");exit(0);
+   NSLog(@"PASS: 200 updates with active Metal rendering, lunar data, resizing, pause/resume, desktop mode and independent settings.");exit(0);
   });
  }
 }

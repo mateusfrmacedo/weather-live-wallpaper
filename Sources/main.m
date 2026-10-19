@@ -12,6 +12,9 @@
 + (void)fetch:(NSDictionary *)location completion:(void(^)(NSDictionary *,NSString *))completion;
 - (instancetype)initWithController:(id)controller;
 - (void)setWallpaper:(BOOL)enabled;
+- (void)showPreferences;
+- (void)refreshSettings;
+- (void)settingsMessage:(NSString *)message;
 - (BOOL)menuBarVisible;
 - (void)setMenuBarVisible:(BOOL)visible;
 - (NSInteger)loginItemStatus;
@@ -87,11 +90,11 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  self.liveButton=[self button:@"Usar clima da cidade" action:@selector(searchCity) filled:NO];[stack addArrangedSubview:self.liveButton];
  [stack addArrangedSubview:[self button:@"Usar como wallpaper" action:@selector(useWallpaper) filled:YES]];
  self.pauseButton=[self button:@"Pausar animação" action:@selector(togglePause) filled:NO];[stack addArrangedSubview:self.pauseButton];
- self.settingsButton=[self button:@"Preferências" action:nil filled:NO];self.settingsButton.showsMenuAsPrimaryAction=YES;[stack addArrangedSubview:self.settingsButton];
+ self.settingsButton=[self button:@"Configurações" action:@selector(showPreferences) filled:NO];[stack addArrangedSubview:self.settingsButton];
  self.statusLabel=[self label:@"" size:11 weight:UIFontWeightRegular];self.statusLabel.textColor=[UIColor colorWithWhite:1 alpha:0.6];self.statusLabel.hidden=YES;[stack addArrangedSubview:self.statusLabel];
  [NSLayoutConstraint activateConstraints:@[[self.panel.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:24],[self.panel.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:24],[self.panel.widthAnchor constraintEqualToConstant:304],[stack.leadingAnchor constraintEqualToAnchor:self.panel.contentView.leadingAnchor constant:22],[stack.trailingAnchor constraintEqualToAnchor:self.panel.contentView.trailingAnchor constant:-22],[stack.topAnchor constraintEqualToAnchor:self.panel.contentView.topAnchor constant:22],[stack.bottomAnchor constraintEqualToAnchor:self.panel.contentView.bottomAnchor constant:-22]]];self.overrideUserInterfaceStyle=UIUserInterfaceStyleDark;
 }
-- (void)setStatus:(NSString *)text {self.statusLabel.text=text;self.statusLabel.hidden=text.length==0;}
+- (void)setStatus:(NSString *)text {self.statusLabel.text=text;self.statusLabel.hidden=text.length==0;[self.desktopBridge settingsMessage:text];}
 - (void)buildSceneMenu {
  NSMutableArray *actions=[NSMutableArray new];__weak typeof(self) weakSelf=self;
  UIAction *automatic=[UIAction actionWithTitle:@"Clima automático" image:[UIImage systemImageNamed:@"arrow.triangle.2.circlepath"] identifier:nil handler:^(UIAction *action){[weakSelf enableAutomaticWeather];}];automatic.state=self.automaticWeather ? UIMenuElementStateOn : UIMenuElementStateOff;[actions addObject:automatic];
@@ -158,7 +161,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  NSString *query=[self.cityField.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];if(query.length<2){[self setStatus:@"Digite o nome da cidade."];return;}self.liveButton.enabled=NO;[self setStatus:@"Buscando cidades…"];__weak typeof(self) weakSelf=self;
  [NSClassFromString(@"WeatherService") search:query completion:^(NSArray<NSDictionary *> *cities,NSString *error){WeatherController *self=weakSelf;if(!self)return;self.liveButton.enabled=YES;if(error || !cities.count){[self setStatus:error ?: @"Nenhuma cidade encontrada."];return;}
  UIAlertController *alert=[UIAlertController alertControllerWithTitle:@"Escolha a cidade" message:nil preferredStyle:UIAlertControllerStyleAlert];
- for(NSDictionary *city in cities){NSString *title=[NSString stringWithFormat:@"%@ · %@, %@",city[@"name"],city[@"admin1"] ?: @"",city[@"country"] ?: @""];[alert addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault handler:^(UIAlertAction *action){self.requestGeneration++;self.requesting=NO;self.location=city;self.liveWeather=nil;[NSUserDefaults.standardUserDefaults removeObjectForKey:@"LastWeatherCache"];[NSUserDefaults.standardUserDefaults setObject:city forKey:@"SelectedLocation"];[self enableAutomaticWeather];}]];}
+ for(NSDictionary *city in cities){NSString *title=[NSString stringWithFormat:@"%@ · %@, %@",city[@"name"],city[@"admin1"] ?: @"",city[@"country"] ?: @""];[alert addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault handler:^(UIAlertAction *action){[self selectCity:city];}]];}
  [alert addAction:[UIAlertAction actionWithTitle:@"Cancelar" style:UIAlertActionStyleCancel handler:^(UIAlertAction *action){[self setStatus:@"Seleção cancelada."];}]];[self presentViewController:alert animated:YES completion:nil];}];
 }
 - (BOOL)textFieldShouldReturn:(UITextField *)field {[field resignFirstResponder];[self searchCity];return YES;}
@@ -174,7 +177,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  self.live=YES;self.condition=self.liveWeather[@"condition"];self.timeControl.enabled=NO;
  double elevation=[self.liveWeather[@"elevation"] doubleValue];self.timeControl.selectedSegmentIndex=elevation>6 ? 0 : elevation> -6 ? 1 : 2;
  self.cityLabel.text=self.location[@"name"];self.temperatureLabel.text=[NSString stringWithFormat:@"%.0f°",[self.liveWeather[@"temperature"] doubleValue]];
- [self applyWeather];[self buildSceneMenu];
+ [self applyWeather];[self buildSceneMenu];[self rebuildPreferences];
 }
 - (void)enableAutomaticWeather {
  self.automaticWeather=YES;[NSUserDefaults.standardUserDefaults setBool:YES forKey:@"AutomaticWeatherEnabled"];
@@ -206,31 +209,26 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  CGFloat scale=self.view.window.screen.scale ?: UIScreen.mainScreen.scale;
  self.weatherView.contentScaleFactor=scale;[self.weatherView setPreferredFramesPerSecond:fps];
 }
-- (void)rebuildPreferences {
- if(!self.desktopBridge)return;
- __weak typeof(self) weakSelf=self;
- BOOL login=[self.desktopBridge loginItemStatus]==1 || [self.desktopBridge loginItemStatus]==2;
- UIAction *start=[UIAction actionWithTitle:@"Iniciar com o Mac" image:nil identifier:nil handler:^(UIAction *action){
-  [weakSelf.desktopBridge setLaunchAtLogin:!login completion:^(NSString *error){[weakSelf setStatus:error ?: @""];[weakSelf rebuildPreferences];}];
- }];start.state=login ? UIMenuElementStateOn : UIMenuElementStateOff;
- BOOL hidden=![self.desktopBridge menuBarVisible];
- UIAction *hide=[UIAction actionWithTitle:@"Ocultar da barra de menus" image:nil identifier:nil handler:^(UIAction *action){[weakSelf.desktopBridge setMenuBarVisible:hidden];[weakSelf rebuildPreferences];}];hide.state=hidden ? UIMenuElementStateOn : UIMenuElementStateOff;
- UIAction *automatic=[UIAction actionWithTitle:@"Atualizar clima automaticamente" image:nil identifier:nil handler:^(UIAction *action){
-  if(weakSelf.automaticWeather){weakSelf.automaticWeather=NO;weakSelf.requestGeneration++;weakSelf.requesting=NO;[NSUserDefaults.standardUserDefaults setBool:NO forKey:@"AutomaticWeatherEnabled"];[weakSelf buildSceneMenu];[weakSelf rebuildPreferences];}else [weakSelf enableAutomaticWeather];
- }];automatic.state=self.automaticWeather ? UIMenuElementStateOn : UIMenuElementStateOff;
- NSMutableArray *qualities=[NSMutableArray new];
+- (void)rebuildPreferences {[self.desktopBridge refreshSettings];}
+- (NSDictionary *)settingsState {
  BOOL high=[NSUserDefaults.standardUserDefaults objectForKey:@"HighQualityRendering"]==nil || [NSUserDefaults.standardUserDefaults boolForKey:@"HighQualityRendering"];
- for(NSNumber *value in @[@YES,@NO]){
-  UIAction *quality=[UIAction actionWithTitle:value.boolValue ? @"Alta · Retina, até 60 fps" : @"Econômica · 30 fps" image:nil identifier:nil handler:^(UIAction *action){[NSUserDefaults.standardUserDefaults setBool:value.boolValue forKey:@"HighQualityRendering"];[weakSelf applyRenderingQuality];[weakSelf rebuildPreferences];}];quality.state=(value.boolValue==high) ? UIMenuElementStateOn : UIMenuElementStateOff;[qualities addObject:quality];
- }
- UIAction *refresh=[UIAction actionWithTitle:@"Atualizar agora" image:[UIImage systemImageNamed:@"arrow.clockwise"] identifier:nil handler:^(UIAction *action){[weakSelf enableAutomaticWeather];}];
- UIAction *restoreHint=[UIAction actionWithTitle:@"Reabrir controles: ⌘⇧P ou abrir o app" image:nil identifier:nil handler:^(UIAction *action){}];restoreHint.attributes=UIMenuElementAttributesDisabled;
- self.settingsButton.menu=[UIMenu menuWithTitle:@"Preferências" children:@[automatic,start,hide,[UIMenu menuWithTitle:@"Qualidade" children:qualities],refresh,restoreHint]];
+ NSString *summary=self.live ? [NSString stringWithFormat:@"%.0f° · %@",[self.liveWeather[@"temperature"] doubleValue],conditionTitle(self.condition)] : @"Clima da cidade escolhida no seu desktop";
+ return @{@"city":self.location[@"name"] ?: @"Escolha uma cidade",@"summary":summary,@"automatic":@(self.automaticWeather),@"highQuality":@(high),@"paused":@(self.paused)};
 }
-- (void)showPreferences {[self rebuildPreferences];if(@available(macCatalyst 17.4,*))[self.settingsButton performPrimaryAction];}
+- (void)setAutomaticWeatherEnabled:(BOOL)enabled {
+ if(enabled){[self enableAutomaticWeather];return;}
+ self.automaticWeather=NO;self.requestGeneration++;self.requesting=NO;[NSUserDefaults.standardUserDefaults setBool:NO forKey:@"AutomaticWeatherEnabled"];[self buildSceneMenu];[self rebuildPreferences];
+}
+- (void)setHighQualityRendering:(BOOL)enabled {[NSUserDefaults.standardUserDefaults setBool:enabled forKey:@"HighQualityRendering"];[self applyRenderingQuality];[self rebuildPreferences];}
+- (void)refreshWeatherNow {[self enableAutomaticWeather];}
+- (void)searchCities:(NSString *)query completion:(void(^)(NSArray<NSDictionary *> *,NSString *))completion {[NSClassFromString(@"WeatherService") search:query completion:completion];}
+- (void)selectCity:(NSDictionary *)city {
+ self.requestGeneration++;self.requesting=NO;self.location=city;self.liveWeather=nil;[NSUserDefaults.standardUserDefaults removeObjectForKey:@"LastWeatherCache"];[NSUserDefaults.standardUserDefaults setObject:city forKey:@"SelectedLocation"];[self enableAutomaticWeather];
+}
+- (void)showPreferences {[self.desktopBridge showPreferences];}
 - (void)useWallpaper {if(!self.ready || !self.desktopBridge)return;self.panel.hidden=YES;[self.weatherView _allowGPUBackgroundExecution];[self.desktopBridge setWallpaper:YES];self.wallpaper=YES;}
 - (void)showPreview {self.panel.hidden=NO;[self.desktopBridge setWallpaper:NO];self.wallpaper=NO;}
-- (void)togglePause {self.paused=!self.paused;[self.scene setPaused:self.paused];[self.weatherView setRendersContinuously:!self.paused];UIButtonConfiguration *c=[self.pauseButton.configuration copy];c.title=self.paused ? @"Continuar animação" : @"Pausar animação";self.pauseButton.configuration=c;}
+- (void)togglePause {self.paused=!self.paused;[self.scene setPaused:self.paused];[self.weatherView setRendersContinuously:!self.paused];UIButtonConfiguration *c=[self.pauseButton.configuration copy];c.title=self.paused ? @"Continuar animação" : @"Pausar animação";self.pauseButton.configuration=c;[self rebuildPreferences];}
 - (void)dealloc {[self.refreshTimer invalidate];[NSNotificationCenter.defaultCenter removeObserver:self];}
 @end
 @interface WeatherSceneDelegate : UIResponder <UIWindowSceneDelegate>
