@@ -11,7 +11,8 @@ int main(int argc, char **argv) {
    NSBitmapImageRep *bitmap=[[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL pixelsWide:size pixelsHigh:size bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO colorSpaceName:NSDeviceRGBColorSpace bytesPerRow:0 bitsPerPixel:0];
    [NSGraphicsContext saveGraphicsState];
    [NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:bitmap]];
-   NSAffineTransform *flip=[NSAffineTransform transform];[flip translateXBy:size yBy:0];[flip scaleXBy:-1 yBy:1];[flip concat];
+   NSAffineTransform *mirror=[NSAffineTransform transform];
+   [mirror translateXBy:size yBy:0];[mirror scaleXBy:-1 yBy:1];[mirror concat];
    [source drawInRect:NSMakeRect(0,0,size,size) fromRect:NSZeroRect operation:NSCompositingOperationCopy fraction:1 respectFlipped:NO hints:@{NSImageHintInterpolation:@(NSImageInterpolationHigh)}];
    [NSGraphicsContext restoreGraphicsState];
    NSString *name=[NSString stringWithFormat:@"icon_%@x%@%@.png",dimension,dimension,scale==2 ? @"@2x" : @""];

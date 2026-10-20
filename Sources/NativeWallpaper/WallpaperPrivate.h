@@ -10,6 +10,8 @@
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 
+void WWBuildMeteorLayers(CALayer * _Nonnull layer, CGImageRef _Nonnull texture, CGSize size, uint32_t seed);
+
 // MARK: - Private CAContext API (for remote rendering)
 
 @interface CAContext : NSObject

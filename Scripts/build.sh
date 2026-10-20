@@ -5,7 +5,7 @@ sdk="$(xcrun --sdk macosx --show-sdk-path)"
 app="$PWD/Build/Weather Wallpaper.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 xcrun clang -fobjc-arc -framework AppKit Scripts/make-icon.m -o Build/make-icon
-Build/make-icon /System/Applications/Weather.app/Contents/Resources/AppIcon.icns Build/AppIcon.iconset
+Build/make-icon "$PWD/Assets/AppIcon-Night.png" Build/AppIcon.iconset
 xcrun iconutil -c icns Build/AppIcon.iconset -o "$app/Contents/Resources/AppIcon.icns"
 xcrun swiftc -target arm64-apple-ios17.0-macabi -sdk "$sdk" -parse-as-library -emit-object Sources/WeatherRuntime.swift -o Build/WeatherRuntime.o
 xcrun swiftc -target arm64-apple-ios17.0-macabi -sdk "$sdk" -parse-as-library -emit-object Sources/WeatherService.swift -o Build/WeatherService.o

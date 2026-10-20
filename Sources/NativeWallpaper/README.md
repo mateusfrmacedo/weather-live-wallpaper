@@ -12,7 +12,7 @@ Run `Scripts/test-native-modes.sh` after building to verify switching during pre
 
 ## Behaviour (Ao bloquear)
 
-- Subtle Moon and star bloom, with native phase textures and lunar positions. The spawn shape overscans the upper corners without scaling the emitter, preserving native lunar occlusion and a gentle horizon mask retains faint lower stars. The original Apple shooting-star texture fades over a short 30%-width route in 1.1 seconds via Core Animation in both modes. Native playback composites it separately from the weather movie, using the locally exported meteor.png texture. It pauses with the renderer and needs no application timer.
+- Subtle Moon and star bloom, with native phase textures and lunar positions. The spawn shape overscans the upper corners without scaling the emitter, preserving native lunar occlusion and a gentle horizon mask retains faint lower stars. The original Apple shooting-star texture fades over a short 0.48–0.52 second passage with variable 11–15 second intervals and animated trail dimensions via Core Animation in both modes. Native playback composites it separately from the weather movie, using the locally exported meteor.png texture. It pauses with the renderer and needs no application timer.
 - Lock screen / screen saver: loop an 16-second recording of Apple's WeatherUI scene.
 - Unlock: reduce playback speed over 2.5 seconds, then keep the last displayed frame. No recurring frame decoding on the static desktop.
 - Listen to session lock/unlock and screen saver notifications as well as WallpaperAgent requests. A session query recovers missed lock notifications. Partial/wrapped agent updates preserve omitted playback and geometry fields instead of resetting them to desktop defaults.

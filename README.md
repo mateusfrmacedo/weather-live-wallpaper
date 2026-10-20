@@ -39,9 +39,9 @@ open "Build/Weather Wallpaper Native.app"
 
 See [native wallpaper setup, tests and limitations](Sources/NativeWallpaper/README.md). The downloadable release includes both playback modes in **Weather Wallpaper.app**. The command above builds a separate development app; `Scripts/package.sh` builds the distributable DMG and ZIP.
 
-## Novidades da versão 0.3.5
+## Novidades da versão 0.3.7
 
-- Estrela cadente com trajeto curto de 1,1 segundo, animada separadamente do vídeo no modo de bloqueio.
+- Estrela cadente com duração de aproximadamente meio segundo, intervalos variáveis e rastro que cresce e se desfaz, baseada nos parâmetros do Tempo. Veja a [referência da animação](Docs/Meteors.md).
 - Lua e estrelas com brilho discreto, preservando os tempos nativos de cintilação e a oclusão lunar.
 - Maior cobertura de estrelas nos cantos superiores e enquadramento da Lua adaptado à proporção da tela.
 - Atualização da composição ao trocar de monitor ou escala Retina.

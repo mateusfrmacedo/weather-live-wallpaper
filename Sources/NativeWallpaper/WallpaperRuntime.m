@@ -1,5 +1,10 @@
 #import "WallpaperPrivate.h"
 #import <IOSurface/IOSurface.h>
+#import "../MeteorAnimation.h"
+
+void WWBuildMeteorLayers(CALayer *layer,CGImageRef texture,CGSize size,uint32_t seed) {
+ WWPopulateMeteorLayer(layer,texture,size,seed);
+}
 
 id WWRemoteContext(unsigned int identifier) {
  Class cls=NSClassFromString(@"WallpaperRemoteContextXPC");

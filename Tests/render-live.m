@@ -31,8 +31,11 @@
  if(index==0){
   for(NSValue *value in @[[NSValue valueWithCGSize:CGSizeMake(1512,982)],[NSValue valueWithCGSize:CGSizeMake(5120,1440)]]){
    CGSize size=value.CGSizeValue;WWShootingStarLayer *meteor=[WWShootingStarLayer layerForSize:size];
-   WWMeteorSample start=WWMeteorAt(size,1.01),end=WWMeteorAt(size,2.09);
-   if(!meteor.texture.CGImage || start.center.x>size.width*0.77 || end.center.x<size.width*0.45 || start.center.x-end.center.x>size.width*0.31 || start.opacity>0.24 || end.opacity>0.24){NSLog(@"FAIL: native shooting-star texture or short route");exit(1);}
+   CALayer *sprite=meteor.sublayers.firstObject;
+   CAAnimationGroup *group=(id)[sprite animationForKey:@"meteor"];
+   CAKeyframeAnimation *position=(id)group.animations.firstObject;
+   double life=([position.keyTimes[2] doubleValue]-[position.keyTimes[1] doubleValue])*group.duration;
+   if(!meteor.texture.CGImage || meteor.sublayers.count!=16 || life<0.48 || life>0.52){NSLog(@"FAIL: native meteor lifetime or texture");exit(1);}
    [meteor setPlaybackPaused:YES];if(!meteor.playbackPaused){NSLog(@"FAIL: shooting star pause");exit(1);}[meteor setPlaybackPaused:NO];
   }
  }

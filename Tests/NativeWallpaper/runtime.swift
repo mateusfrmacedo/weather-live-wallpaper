@@ -59,11 +59,26 @@ func run(for seconds: TimeInterval) { RunLoop.main.run(until: Date(timeIntervalS
             if let meteor {
                 check(meteor.speed == 0,"meteor is initially paused on the static desktop")
                 let trajectory = meteor.sublayers?.first?.animation(forKey: "meteor") as? CAAnimationGroup
-                if let positions = (trajectory?.animations?.first as? CAKeyframeAnimation)?.values as? [NSValue], positions.count == 4 {
-                    let distance = positions[0].pointValue.x - positions[2].pointValue.x
-                    check(abs(distance / session.root.bounds.width - 0.30) < 0.001, "meteor fades after a short route, without crossing the viewport")
+                check(meteor.sublayers?.count == 16, "meteors use varied bursts instead of one fixed repeating route")
+                if let track = trajectory?.animations?.first as? CAKeyframeAnimation, let times = track.keyTimes, let duration = trajectory?.duration {
+                    let lifetime = (times[2].doubleValue - times[1].doubleValue) * duration
+                    check((0.479 ... 0.521).contains(lifetime), "meteor retains Weather's half-second lifetime")
+                } else { fatalError("Missing meteor trajectory") }
+                check(trajectory?.animations?.count == 4, "meteor animates travel, opacity, length and thickness")
+                var starts = [Double]()
+                for sprite in meteor.sublayers ?? [] {
+                    guard let group = sprite.animation(forKey: "meteor") as? CAAnimationGroup,
+                          let motion = group.animations?.first as? CAKeyframeAnimation,
+                          let times = motion.keyTimes,
+                          let width = group.animations?[2] as? CAKeyframeAnimation,
+                          let lengths = width.values as? [NSNumber] else { fatalError("Missing meteor tracks") }
+                    starts.append(times[1].doubleValue * group.duration)
+                    let lifetime = (times[2].doubleValue - times[1].doubleValue) * group.duration
+                    check((0.479 ... 0.521).contains(lifetime), "all meteor passages retain the native lifetime range")
+                    check(lengths[3].doubleValue > lengths[0].doubleValue * 3 && lengths[4].doubleValue < lengths[3].doubleValue, "trail grows and then contracts before disappearing")
                 }
-                check(trajectory?.duration == 13 && (trajectory?.animations?.first as? CAKeyframeAnimation)?.values?.count == 4,"meteor uses a continuous compositor trajectory")
+                for pair in zip(starts, starts.dropFirst()) { check((11 ... 15).contains(pair.1 - pair.0), "burst spacing follows the native random range") }
+                check(Set(starts.dropFirst().enumerated().map { starts[$0.offset + 1] - starts[$0.offset] }).count > 1, "burst intervals vary")
             }
             check(WWCreateSnapshot(session.image) != nil, "snapshot IOSurface ABI")
             session.update(mode: "default", suspended: false)

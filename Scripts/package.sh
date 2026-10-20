@@ -38,11 +38,12 @@ Mantenha o app aberto para atualizar o clima. A primeira preparação
 leva alguns segundos. A seleção anterior do papel de parede do sistema
 não é substituída automaticamente.
 
-Novidades 0.3.5: brilho discreto da Lua e das estrelas, preservando a
-oclusão lunar e os tempos de cintilação. Estrela cadente com trajeto curto
-e animação independente do vídeo no modo de bloqueio. Melhor cobertura
-dos cantos, enquadramento em monitores externos e captura na escala
-física da tela. Vídeo HEVC Main10 com cores sRGB alinhadas ao poster.
+Novidades 0.3.7: ícone noturno com Lua à direita e nuvem sobre fundo
+azul-escuro. Estrela cadente baseada nos parâmetros do Tempo: passagem
+de aproximadamente meio segundo, intervalos variáveis de 11–15 segundos
+e rastro que cresce e se desfaz, animado separadamente do vídeo.
+Mantém o brilho discreto da Lua e das estrelas e os ajustes para monitores
+externos, com vídeo HEVC Main10 e cores sRGB alinhadas ao poster.
 Inclui dois modos de animação, configurações compactas,
 botões Liquid Glass e preferência de modo salva.
 O loop nativo é experimental e pode apresentar uma emenda visível.

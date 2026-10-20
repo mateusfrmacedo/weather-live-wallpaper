@@ -15,7 +15,7 @@ Referências oficiais consultadas em 20/10/2026. As resoluções abaixo são pix
 
 A composição considera a proporção e a escala do destino, não apenas suas polegadas. A janela acompanha mudanças de tela e de escala; a camada de estrelas tem margem nas duas direções. A câmera mantém margem para a Lua e a reprodução nativa preserva a borda superior ao preencher uma tela com outra proporção. O ajuste não fornece renderizações meteorológicas independentes por monitor: uma gravação ainda é compartilhada entre os destinos.
 
-A estrela cadente do modo de bloqueio é uma camada Core Animation, com textura preparada localmente e publicada junto da cena. Ela acompanha o compositor da tela e não é gravada nos quadros do vídeo de nuvens. A trajetória percorre 30% da largura em 1,1 segundo e desaparece, com pausa e retomada ligadas ao estado da sessão.
+A estrela cadente do modo de bloqueio é uma camada Core Animation, com textura preparada localmente e publicada junto da cena. Ela acompanha o compositor da tela e não é gravada nos quadros do vídeo de nuvens. A passagem dura aproximadamente meio segundo, com intervalos variáveis de 11–15 segundos e rastro que muda de tamanho, com pausa e retomada ligadas ao estado da sessão.
 
 A imagem e o vídeo usam a mesma curva sRGB. A gravação usa HEVC Main10, com reprodução em buffers de 10 bits e composição em 16 bits por componente. A entrada Metal e o poster continuam sujeitos à precisão do renderizador original; isso não transforma a origem em HDR. A névoa decorativa de nebulosas foi removida por criar manchas no gradiente. A exportação preserva os pixels físicos até 6144 pixels no maior lado.
 
