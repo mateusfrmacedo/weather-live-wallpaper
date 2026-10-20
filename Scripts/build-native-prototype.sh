@@ -31,7 +31,7 @@ xcrun clang -fobjc-arc -bundle -target arm64-apple-macos14.0 -isysroot "$sdk" \
 codesign --force --sign - "$bridge"
 xcrun clang -fobjc-arc -target arm64-apple-ios17.0-macabi -isysroot "$sdk" \
  -iframework "$sdk/System/iOSSupport/System/Library/Frameworks" \
- -framework UIKit -framework Foundation -framework QuartzCore -framework ImageIO -framework CoreGraphics -framework MetalKit -framework Metal -framework WeatherKit -framework AVFoundation -framework CoreVideo -framework CoreMedia \
+ -framework UIKit -framework Foundation -framework QuartzCore -framework ImageIO -framework CoreGraphics -framework MetalKit -framework Metal -framework WeatherKit -framework AVFoundation -framework VideoToolbox -framework CoreVideo -framework CoreMedia \
  Sources/NativeWallpaper/PrototypeHost.m Sources/NativeWallpaper/SceneExporter.m \
  Build/WeatherRuntime.o Build/WeatherService.o Sources/SwiftCall.s -o "$app/Contents/MacOS/WeatherWallpaper"
 extension="$app/Contents/Extensions/WeatherWallpaper.appex"

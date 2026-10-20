@@ -4,6 +4,7 @@
 - (instancetype)initWithContentsOf:(NSURL *)url options:(id)options error:(NSError **)error;
 - (void)setScene:(id)scene;
 - (id)scene;
+- (void)setScaleFactor:(double)scale;
 - (void)setPreferredFramesPerSecond:(NSInteger)fps;
 - (void)setPixelFormat:(NSUInteger)format;
 - (void)setRendersContinuously:(BOOL)enabled;

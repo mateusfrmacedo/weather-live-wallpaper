@@ -23,6 +23,7 @@ final class WeatherWallpaperSession {
     private var saverRunning = false
     private var movieURL: URL?
     private(set) var renderedFrameCount = 0
+    private var meteor: WallpaperMeteor?
     private var playbackObserver: NSKeyValueObservation?
 
     init?(size: CGSize, scale: CGFloat, displayID: UInt32?) {
@@ -31,7 +32,8 @@ final class WeatherWallpaperSession {
         guard let context = CAContext.remoteContext(withOptions: options) as? CAContext, context.contextId != 0 else { return nil }
         self.context = context
         root.backgroundColor = NSColor(calibratedRed: 0.12, green: 0.22, blue: 0.38, alpha: 1).cgColor
-        imageLayer.contentsGravity = .resizeAspectFill
+        root.masksToBounds = true
+        imageLayer.contentsGravity = .resize
         imageLayer.masksToBounds = true
         root.addSublayer(imageLayer)
         resize(size: size, scale: scale)
@@ -41,9 +43,18 @@ final class WeatherWallpaperSession {
         CATransaction.begin(); CATransaction.setDisableActions(true)
         root.frame = CGRect(origin: .zero, size: size)
         root.contentsScale = scale
-        imageLayer.frame = root.bounds
+        imageLayer.frame = Self.topAnchoredFill(image: image.map {CGSize(width: $0.width, height: $0.height)} ?? size, destination: size)
+        meteor?.resize(size)
         imageLayer.contentsScale = scale
         CATransaction.commit()
+    }
+    // Keep the complete upper edge when a 16:10 capture fills a 16:9 monitor.
+    // Centre cropping previously removed the lunar disc near that edge.
+    static func topAnchoredFill(image: CGSize, destination: CGSize) -> CGRect {
+        guard image.width > 0, image.height > 0 else { return CGRect(origin: .zero, size: destination) }
+        let scale = max(destination.width / image.width, destination.height / image.height)
+        let width = image.width * scale, height = image.height * scale
+        return CGRect(x: (destination.width - width) / 2, y: destination.height - height, width: width, height: height)
     }
     func update(mode: String?, suspended: Bool?, preview: Bool? = nil) {
         if let mode { requestedMode = mode }
@@ -63,6 +74,7 @@ final class WeatherWallpaperSession {
         let previous = policy.phase
         policy.update(mode: mode, suspended: requestedSuspended, now: ProcessInfo.processInfo.systemUptime)
         let rate = policy.rate(at: ProcessInfo.processInfo.systemUptime)
+        meteor?.setRate(rate)
         if rate > 0 { startPlaybackIfNeeded(); startTimer() }
         else { player?.pause(); stopTimer() }
         if previous != policy.phase { debugLog("Playback \(previous) -> \(policy.phase), mode=\(mode) decoded=\(renderedFrameCount)") }
@@ -80,6 +92,9 @@ final class WeatherWallpaperSession {
               let source = CGImageSourceCreateWithURL(directory.appendingPathComponent("poster.png") as CFURL, nil),
               let poster = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
         generation = next
+        meteor?.layer.removeFromSuperlayer()
+        meteor = WallpaperMeteor(directory: directory, metadata: manifest)
+        if let meteor { root.addSublayer(meteor.layer); meteor.resize(root.bounds.size); meteor.setRate(policy.rate(at: ProcessInfo.processInfo.systemUptime)) }
         player?.pause(); player = nil; looper = nil; output = nil; playbackObserver = nil
         movieURL = movie
         setImage(poster, crossfade: image != nil)
@@ -98,7 +113,7 @@ final class WeatherWallpaperSession {
         playbackObserver = player.observe(\.currentItem, options: [.initial, .new]) { [weak self] player, _ in
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.player === player, let current = player.currentItem else { return }
-                let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+                let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange])
                 current.add(output); self.output = output
             }
         }
@@ -113,16 +128,17 @@ final class WeatherWallpaperSession {
         let now = ProcessInfo.processInfo.systemUptime
         let rate = policy.rate(at: now)
         guard rate > 0 else {
-            player?.pause(); stopTimer()
+            player?.pause(); meteor?.setRate(0); stopTimer()
             debugLog("Playback frozen, decoded=\(renderedFrameCount)")
             return
         }
         player?.rate = rate
+        meteor?.setRate(rate)
         guard let output else { return }
         let time = output.itemTime(forHostTime: CACurrentMediaTime())
         guard output.hasNewPixelBuffer(forItemTime: time), let buffer = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) else { return }
         let ci = CIImage(cvPixelBuffer: buffer)
-        guard let frame = ciContext.createCGImage(ci, from: ci.extent) else { return }
+        guard let frame = ciContext.createCGImage(ci, from: ci.extent, format: .RGBA16, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else { return }
         renderedFrameCount += 1
         if renderedFrameCount == 1 { debugLog("First animated frame decoded") }
         setImage(frame, crossfade: false)
@@ -136,11 +152,12 @@ final class WeatherWallpaperSession {
         }
         CATransaction.begin(); CATransaction.setDisableActions(true)
         imageLayer.contents = frame; image = frame
+        imageLayer.frame = Self.topAnchoredFill(image: CGSize(width: frame.width, height: frame.height), destination: root.bounds.size)
         CATransaction.commit()
     }
     func stop() {
         player?.pause(); player = nil; looper = nil; output = nil
-        playbackObserver = nil; stopTimer(); context.layer = nil
+        playbackObserver = nil; meteor?.layer.removeFromSuperlayer(); meteor = nil; stopTimer(); context.layer = nil
     }
     deinit { displayTimer?.invalidate() }
 }

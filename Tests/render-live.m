@@ -32,7 +32,7 @@
   for(NSValue *value in @[[NSValue valueWithCGSize:CGSizeMake(1512,982)],[NSValue valueWithCGSize:CGSizeMake(5120,1440)]]){
    CGSize size=value.CGSizeValue;WWShootingStarLayer *meteor=[WWShootingStarLayer layerForSize:size];
    WWMeteorSample start=WWMeteorAt(size,1.01),end=WWMeteorAt(size,2.09);
-   if(!meteor.texture.CGImage || start.center.x<size.width || end.center.x>0 || start.opacity>0.24 || end.opacity>0.24){NSLog(@"FAIL: native shooting-star texture or full-screen route");exit(1);}
+   if(!meteor.texture.CGImage || start.center.x>size.width*0.77 || end.center.x<size.width*0.45 || start.center.x-end.center.x>size.width*0.31 || start.opacity>0.24 || end.opacity>0.24){NSLog(@"FAIL: native shooting-star texture or short route");exit(1);}
    [meteor setPlaybackPaused:YES];if(!meteor.playbackPaused){NSLog(@"FAIL: shooting star pause");exit(1);}[meteor setPlaybackPaused:NO];
   }
  }

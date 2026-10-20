@@ -40,6 +40,12 @@ func run(for seconds: TimeInterval) { RunLoop.main.run(until: Date(timeIntervalS
             policy.update(mode: "locked", suspended: false, now: 7)
             check(policy.rate(at: 7) == 1, "wake resumes lock playback")
         }
+        // Apple laptop/desktop panels and the user's QHD external monitor.
+        let displays: [CGSize] = [CGSize(width: 2560,height: 1664),CGSize(width: 2880,height: 1864),CGSize(width: 3024,height: 1964),CGSize(width: 3456,height: 2234),CGSize(width: 4480,height: 2520),CGSize(width: 5120,height: 2880),CGSize(width: 6016,height: 3384),CGSize(width: 2560,height: 1440)]
+        for display in displays {
+            let frame = WeatherWallpaperSession.topAnchoredFill(image: CGSize(width: 3024,height: 1964), destination: display)
+            check(abs(frame.maxY-display.height)<0.01 && frame.width>=display.width && frame.height>=display.height,"display fill preserves upper edge and covers canvas")
+        }
         guard dlopen("/System/Library/PrivateFrameworks/WallpaperExtensionKit.framework/WallpaperExtensionKit", RTLD_NOW) != nil else { fatalError("private framework missing") }
         let thumbnail = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("Build/Weather Wallpaper Native.app/Contents/Extensions/WeatherWallpaper.appex/Contents/Resources/weather-thumbnail.png")
         guard let models = buildSettingsViewModelsXPC(thumbnailURL: thumbnail) else { fatalError("settings ABI mismatch") }
@@ -49,6 +55,16 @@ func run(for seconds: TimeInterval) { RunLoop.main.run(until: Date(timeIntervalS
             check(WWRemoteContext(session.context.contextId) != nil, "remote-context ABI")
             session.loadLatestScene()
             check(session.image != nil && session.generation != nil, "published movie and poster load")
+            let meteor = session.root.sublayers?.count == 2 ? session.root.sublayers?.last : nil
+            if let meteor {
+                check(meteor.speed == 0,"meteor is initially paused on the static desktop")
+                let trajectory = meteor.sublayers?.first?.animation(forKey: "meteor") as? CAAnimationGroup
+                if let positions = (trajectory?.animations?.first as? CAKeyframeAnimation)?.values as? [NSValue], positions.count == 4 {
+                    let distance = positions[0].pointValue.x - positions[2].pointValue.x
+                    check(abs(distance / session.root.bounds.width - 0.30) < 0.001, "meteor fades after a short route, without crossing the viewport")
+                }
+                check(trajectory?.duration == 13 && (trajectory?.animations?.first as? CAKeyframeAnimation)?.values?.count == 4,"meteor uses a continuous compositor trajectory")
+            }
             check(WWCreateSnapshot(session.image) != nil, "snapshot IOSurface ABI")
             session.update(mode: "default", suspended: false)
             run(for: 0.5)
@@ -56,6 +72,11 @@ func run(for seconds: TimeInterval) { RunLoop.main.run(until: Date(timeIntervalS
             session.update(mode: "locked", suspended: false)
             run(for: 2)
             check(session.renderedFrameCount > 5, "lock renders actual video frames")
+            check(session.image?.bitsPerComponent == 16, "movie decoding retains precision for dark gradients")
+            check(meteor == nil || meteor?.speed == 1,"meteor animates independently of weather movie timestamps")
+            let meteorStart = meteor?.sublayers?.first?.animation(forKey: "meteor")?.beginTime
+            session.resize(size: session.root.bounds.size,scale: session.root.contentsScale)
+            check(meteor?.sublayers?.first?.animation(forKey: "meteor")?.beginTime == meteorStart,"unchanged geometry does not restart the meteor")
             let beforePartialUpdate = session.renderedFrameCount
             session.update(mode: nil, suspended: nil)
             run(for: 0.3)
@@ -65,6 +86,7 @@ func run(for seconds: TimeInterval) { RunLoop.main.run(until: Date(timeIntervalS
             let frozenCount = session.renderedFrameCount
             run(for: 1)
             check(session.renderedFrameCount == frozenCount, "desktop stops decoding after unlock")
+            check(meteor == nil || meteor?.speed == 0,"meteor also stops after unlock")
             session.loadLatestScene()
             run(for: 0.25)
             check(session.renderedFrameCount == frozenCount, "weather refresh does not restart animation")

@@ -2,6 +2,7 @@
 #import "../ShootingStar.h"
 #import <AVFoundation/AVFoundation.h>
 #import <Metal/Metal.h>
+#import <VideoToolbox/VideoToolbox.h>
 #import <QuartzCore/CAMetalLayer.h>
 #import <objc/runtime.h>
 #include <unistd.h>
@@ -65,16 +66,21 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
  if(![NSFileManager.defaultManager createDirectoryAtPath:root withIntermediateDirectories:YES attributes:@{NSFilePosixPermissions:@0700} error:&error]){[self finish:error];return;}
  self.directory=[NSURL fileURLWithPath:[root stringByAppendingPathComponent:NSUUID.UUID.UUIDString] isDirectory:YES];
  if(![NSFileManager.defaultManager createDirectoryAtURL:self.directory withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@0700} error:&error]){[self finish:error];return;}
+ WWShootingStarLayer *meteor=WWShootingStarForView(view);
+ if(meteor && ![UIImagePNGRepresentation(meteor.texture) writeToURL:[self.directory URLByAppendingPathComponent:@"meteor.png"] atomically:YES]){[self finish:WWExportError(@"Não foi possível preparar a estrela cadente.")];return;}
  // Match real drawable pixels, not logical Cocoa points. A Retina display
  // must not upscale a half-resolution recording back onto its physical pixels.
- CGSize pixels=self.metalLayer.drawableSize;
+ CGFloat displayScale=[metadata[@"renderScale"] doubleValue];
+ CGSize pixels=CGSizeMake(view.bounds.size.width*displayScale,view.bounds.size.height*displayScale);
  if(pixels.width<2 || pixels.height<2){CGFloat backing=view.window.screen.scale ?: UIScreen.mainScreen.scale;pixels=CGSizeMake(view.bounds.size.width*backing,view.bounds.size.height*backing);}
- CGFloat scale=MIN(1,5120/MAX(pixels.width,pixels.height));
+ CGFloat scale=MIN(1,6144/MAX(pixels.width,pixels.height));
  self.outputSize=CGSizeMake(floor(pixels.width*scale/2)*2,floor(pixels.height*scale/2)*2);
  if(self.outputSize.width<2 || self.outputSize.height<2){[self finish:WWExportError(@"A cena ainda não tem tamanho válido.")];return;}
  self.writer=[[AVAssetWriter alloc] initWithURL:[self.directory URLByAppendingPathComponent:@"sky.mov"] fileType:AVFileTypeQuickTimeMovie error:&error];
  if(!self.writer){[self finish:error];return;}
- NSDictionary *settings=@{AVVideoCodecKey:AVVideoCodecTypeHEVC,AVVideoWidthKey:@(self.outputSize.width),AVVideoHeightKey:@(self.outputSize.height),AVVideoCompressionPropertiesKey:@{AVVideoAverageBitRateKey:@(MAX(16000000,self.outputSize.width*self.outputSize.height*5)),AVVideoExpectedSourceFrameRateKey:@24,AVVideoMaxKeyFrameIntervalKey:@24},AVVideoColorPropertiesKey:@{AVVideoColorPrimariesKey:AVVideoColorPrimaries_ITU_R_709_2,AVVideoTransferFunctionKey:AVVideoTransferFunction_ITU_R_709_2,AVVideoYCbCrMatrixKey:AVVideoYCbCrMatrix_ITU_R_709_2}};
+ NSString *transfer=AVVideoTransferFunction_ITU_R_709_2;
+ if(@available(macCatalyst 18.0,*))transfer=AVVideoTransferFunction_IEC_sRGB;
+ NSDictionary *settings=@{AVVideoCodecKey:AVVideoCodecTypeHEVC,AVVideoWidthKey:@(self.outputSize.width),AVVideoHeightKey:@(self.outputSize.height),AVVideoCompressionPropertiesKey:@{AVVideoProfileLevelKey:(__bridge NSString *)kVTProfileLevel_HEVC_Main10_AutoLevel,AVVideoAverageBitRateKey:@(MAX(24000000,self.outputSize.width*self.outputSize.height*8)),AVVideoExpectedSourceFrameRateKey:@24,AVVideoMaxKeyFrameIntervalKey:@24},AVVideoColorPropertiesKey:@{AVVideoColorPrimariesKey:AVVideoColorPrimaries_ITU_R_709_2,AVVideoTransferFunctionKey:transfer,AVVideoYCbCrMatrixKey:AVVideoYCbCrMatrix_ITU_R_709_2}};
  self.input=[AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeVideo outputSettings:settings];self.input.expectsMediaDataInRealTime=YES;
  self.adaptor=[AVAssetWriterInputPixelBufferAdaptor assetWriterInputPixelBufferAdaptorWithAssetWriterInput:self.input sourcePixelBufferAttributes:@{(id)kCVPixelBufferPixelFormatTypeKey:@(kCVPixelFormatType_32BGRA),(id)kCVPixelBufferWidthKey:@(self.outputSize.width),(id)kCVPixelBufferHeightKey:@(self.outputSize.height),(id)kCVPixelBufferCGImageCompatibilityKey:@YES,(id)kCVPixelBufferCGBitmapContextCompatibilityKey:@YES}];
  if(![self.writer canAddInput:self.input]){[self finish:WWExportError(@"O codificador de vídeo não está disponível.")];return;}
@@ -129,12 +135,15 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
    CGContextTranslateCTM(context.CGContext,0,self.view.bounds.size.height);CGContextScaleCTM(context.CGContext,1,-1);
   }
   [[UIImage imageWithCGImage:image] drawInRect:self.view.bounds];
-  [WWShootingStarForView(self.view) drawCurrentFrameInContext:context.CGContext];
+  // The native session adds the meteor as an independent compositor layer.
  }];
  CGImageRelease(image);CGContextRelease(source);
  if(self.frames==0 && ![UIImagePNGRepresentation(frame) writeToURL:[self.directory URLByAppendingPathComponent:@"poster.png"] atomically:YES]){CGColorSpaceRelease(space);[self finish:WWExportError(@"Não foi possível salvar a imagem estática.")];return;}
  CVPixelBufferRef pixel=nil;CVReturn result=CVPixelBufferPoolCreatePixelBuffer(nil,self.adaptor.pixelBufferPool,&pixel);
  if(result!=kCVReturnSuccess){CGColorSpaceRelease(space);[self finish:WWExportError(@"Não foi possível alocar o quadro do vídeo.")];return;}
+ CVBufferSetAttachment(pixel,kCVImageBufferCGColorSpaceKey,space,kCVAttachmentMode_ShouldPropagate);
+ CVBufferSetAttachment(pixel,kCVImageBufferColorPrimariesKey,kCVImageBufferColorPrimaries_ITU_R_709_2,kCVAttachmentMode_ShouldPropagate);
+ CVBufferSetAttachment(pixel,kCVImageBufferTransferFunctionKey,kCVImageBufferTransferFunction_sRGB,kCVAttachmentMode_ShouldPropagate);
  CVPixelBufferLockBaseAddress(pixel,0);
  CGContextRef target=CGBitmapContextCreate(CVPixelBufferGetBaseAddress(pixel),self.outputSize.width,self.outputSize.height,8,CVPixelBufferGetBytesPerRow(pixel),space,kCGImageAlphaPremultipliedFirst|kCGBitmapByteOrder32Little);
  if(target)CGContextDrawImage(target,CGRectMake(0,0,self.outputSize.width,self.outputSize.height),frame.CGImage);
@@ -150,7 +159,7 @@ static NSError *WWExportError(NSString *message) {return [NSError errorWithDomai
  [self.timer invalidate];self.timer=nil;[self.input markAsFinished];[self.writer endSessionAtSourceTime:CMTimeAdd(presentation,CMTimeMake(1,24))];
  [self.writer finishWritingWithCompletionHandler:^{dispatch_async(dispatch_get_main_queue(),^{
   if(self.writer.status!=AVAssetWriterStatusCompleted){[self finish:self.writer.error ?: WWExportError(@"O vídeo não foi finalizado.")];return;}
-  NSMutableDictionary *manifest=[self.metadata mutableCopy];manifest[@"version"]=@1;manifest[@"generation"]=self.directory.lastPathComponent;manifest[@"pixelWidth"]=@(self.outputSize.width);manifest[@"pixelHeight"]=@(self.outputSize.height);manifest[@"codec"]=@"hevc";manifest[@"publishedAt"]=@(NSDate.date.timeIntervalSince1970);
+  NSMutableDictionary *manifest=[self.metadata mutableCopy];manifest[@"version"]=@1;manifest[@"generation"]=self.directory.lastPathComponent;manifest[@"pixelWidth"]=@(self.outputSize.width);manifest[@"pixelHeight"]=@(self.outputSize.height);manifest[@"codec"]=@"hevc-main10";manifest[@"colorTransfer"]=@"srgb";manifest[@"meteorOverlay"]=@(WWShootingStarForView(self.view)!=nil);manifest[@"publishedAt"]=@(NSDate.date.timeIntervalSince1970);
   NSURL *url=[[self.directory URLByDeletingLastPathComponent] URLByAppendingPathComponent:@"current.json"];
   NSError *error=nil;NSData *data=[NSJSONSerialization dataWithJSONObject:manifest options:0 error:&error];
   if(data && ![data writeToURL:url options:NSDataWritingAtomic error:&error])data=nil;

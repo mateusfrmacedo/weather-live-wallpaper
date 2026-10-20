@@ -11,16 +11,15 @@
  CALayer *sprite=[CALayer layer];sprite.contents=(__bridge id)layer.texture.CGImage;
  CGFloat length=MIN(180,MAX(90,size.width*0.12));sprite.bounds=CGRectMake(0,0,length,2);sprite.opacity=0;
  [layer addSublayer:sprite];
- NSMutableArray *times=[NSMutableArray new],*positions=[NSMutableArray new],*alphas=[NSMutableArray new];
- // Linear position and opacity tracks share the exact sampling function used
- // by hidden-window export. Core Animation drives the desktop without a timer.
- for(int i=0;i<=260;i++){
-  double time=13.0*i/260;WWMeteorSample sample=WWMeteorAt(size,time==13 ? 12.999 : time);
-  [times addObject:@(time/13)];[positions addObject:[NSValue valueWithCGPoint:sample.center]];[alphas addObject:@(sample.opacity)];
- }
- sprite.transform=CATransform3DMakeRotation(WWMeteorAt(size,1.5).angle,0,0,1);
- CAKeyframeAnimation *position=[CAKeyframeAnimation animationWithKeyPath:@"position"];position.values=positions;position.keyTimes=times;position.calculationMode=kCAAnimationLinear;
- CAKeyframeAnimation *opacity=[CAKeyframeAnimation animationWithKeyPath:@"opacity"];opacity.values=alphas;opacity.keyTimes=times;opacity.calculationMode=kCAAnimationLinear;
+ // One analytic segment; the compositor interpolates at the display cadence.
+ // Keep the wraparound jump outside the visible interval.
+ WWMeteorSample first=WWMeteorAt(size,1),last=WWMeteorAt(size,2.1);
+ sprite.transform=CATransform3DMakeRotation(first.angle,0,0,1);
+ CAKeyframeAnimation *position=[CAKeyframeAnimation animationWithKeyPath:@"position"];
+ position.values=@[[NSValue valueWithCGPoint:first.center],[NSValue valueWithCGPoint:first.center],[NSValue valueWithCGPoint:last.center],[NSValue valueWithCGPoint:last.center]];
+ position.keyTimes=@[@0,@(1.0/13),@(2.1/13),@1];position.calculationMode=kCAAnimationLinear;
+ CAKeyframeAnimation *opacity=[CAKeyframeAnimation animationWithKeyPath:@"opacity"];
+ opacity.values=@[@0,@0,@0.24,@0.24,@0,@0];opacity.keyTimes=@[@0,@(1.0/13),@(1.132/13),@(1.902/13),@(2.1/13),@1];
  CAAnimationGroup *group=[CAAnimationGroup animation];group.animations=@[position,opacity];group.duration=13;group.repeatCount=HUGE_VALF;group.beginTime=layer.epoch;[sprite addAnimation:group forKey:@"nativeMeteorTexture"];
  return layer;
 }

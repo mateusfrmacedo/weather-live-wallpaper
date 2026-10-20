@@ -8,6 +8,7 @@
 - (void)useWallpaper;
 - (void)togglePause;
 - (void)refreshAfterWake;
+- (void)displayGeometryChanged;
 - (NSDictionary *)settingsState;
 - (void)setAutomaticWeatherEnabled:(BOOL)enabled;
 - (void)setHighQualityRendering:(BOOL)enabled;
@@ -92,10 +93,13 @@ static OSStatus restoreControls(EventHandlerCallRef next, EventRef event, void *
    [self.window center];self.window.title=@"Weather Wallpaper";self.window.titlebarAppearsTransparent=YES;self.window.styleMask|=NSWindowStyleMaskFullSizeContentView;
   }
   [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(screenChanged:) name:NSApplicationDidChangeScreenParametersNotification object:nil];
+  [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(screenChanged:) name:NSWindowDidChangeScreenNotification object:self.window];
+  [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(screenChanged:) name:NSWindowDidChangeBackingPropertiesNotification object:self.window];
   [NSWorkspace.sharedWorkspace.notificationCenter addObserver:self selector:@selector(woke:) name:NSWorkspaceDidWakeNotification object:nil];
  }
  return self;
 }
+- (double)renderBackingScale {return (self.window.screen ?: NSScreen.mainScreen).backingScaleFactor;}
 - (BOOL)menuBarVisible {return self.status.visible;}
 - (void)setMenuBarVisible:(BOOL)visible {
  self.status.visible=visible;[NSUserDefaults.standardUserDefaults setBool:!visible forKey:@"HideMenuBarIcon"];
@@ -132,7 +136,13 @@ static OSStatus restoreControls(EventHandlerCallRef next, EventRef event, void *
  }
  _wallpaper=enabled;
 }
-- (void)screenChanged:(NSNotification *)note {if(self.wallpaper)[self.window setFrame:(self.window.screen ?: NSScreen.mainScreen).frame display:YES];}
+- (void)screenChanged:(NSNotification *)note {
+ if(self.wallpaper)[self.window setFrame:(self.window.screen ?: NSScreen.mainScreen).frame display:YES];
+ // Let AppKit/Catalyst finish backing-scale and bounds changes first.
+ [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(refreshDisplayGeometry) object:nil];
+ [self performSelector:@selector(refreshDisplayGeometry) withObject:nil afterDelay:0.25];
+}
+- (void)refreshDisplayGeometry {[self.controller displayGeometryChanged];}
 - (void)woke:(NSNotification *)note {[self.controller refreshAfterWake];}
 - (void)handleReopen:(NSAppleEventDescriptor *)event reply:(NSAppleEventDescriptor *)reply {[self showPreferences];}
 - (void)showPreview {if(self.wallpaper)[self showPreferences];else [self.controller showPreview];}

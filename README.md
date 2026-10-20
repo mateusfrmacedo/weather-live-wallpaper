@@ -38,3 +38,13 @@ open "Build/Weather Wallpaper Native.app"
 ```
 
 See [native wallpaper setup, tests and limitations](Sources/NativeWallpaper/README.md). The downloadable release includes both playback modes in **Weather Wallpaper.app**. The command above builds a separate development app; `Scripts/package.sh` builds the distributable DMG and ZIP.
+
+## Novidades da versão 0.3.5
+
+- Estrela cadente com trajeto curto de 1,1 segundo, animada separadamente do vídeo no modo de bloqueio.
+- Lua e estrelas com brilho discreto, preservando os tempos nativos de cintilação e a oclusão lunar.
+- Maior cobertura de estrelas nos cantos superiores e enquadramento da Lua adaptado à proporção da tela.
+- Atualização da composição ao trocar de monitor ou escala Retina.
+- Vídeo HEVC Main10 com cores sRGB alinhadas à imagem estática e remoção da névoa decorativa que produzia manchas.
+
+Veja a [tabela de resoluções e os limites da composição](Docs/Displays.md), incluindo MacBooks, iMac, monitores Apple e QHD 2560 × 1440.

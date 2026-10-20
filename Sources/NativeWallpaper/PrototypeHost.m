@@ -58,7 +58,12 @@
 }
 - (NSDictionary *)sceneMetadata {
  double elevation=self.live ? [self.liveWeather[@"elevation"] doubleValue] : (self.timeControl.selectedSegmentIndex==0 ? 35 : self.timeControl.selectedSegmentIndex==1 ? 1 : -25);
- return @{@"renderWidth":@(self.view.bounds.size.width),@"renderHeight":@(self.view.bounds.size.height),@"renderScale":@(self.view.window.screen.scale ?: UIScreen.mainScreen.scale),@"condition":self.condition ?: @"partlyCloudy",@"locationID":[self locationIdentifier],@"manualTime":self.live ? @(-1) : @(self.timeControl.selectedSegmentIndex),@"elevation":@(elevation),@"cloudCover":self.live ? self.liveWeather[@"cloudCover"] ?: @0 : @(cloudCover(self.condition)),@"wind":self.live ? self.liveWeather[@"wind"] ?: @12 : @12};
+ return @{@"renderWidth":@(self.view.bounds.size.width),@"renderHeight":@(self.view.bounds.size.height),@"renderScale":@(self.desktopBridge ? [self.desktopBridge renderBackingScale] : (self.view.window.screen.scale ?: UIScreen.mainScreen.scale)),@"condition":self.condition ?: @"partlyCloudy",@"locationID":[self locationIdentifier],@"manualTime":self.live ? @(-1) : @(self.timeControl.selectedSegmentIndex),@"elevation":@(elevation),@"cloudCover":self.live ? self.liveWeather[@"cloudCover"] ?: @0 : @(cloudCover(self.condition)),@"wind":self.live ? self.liveWeather[@"wind"] ?: @12 : @12};
+}
+- (void)displayGeometryChanged {
+ [self applyRenderingQuality];
+ // Include backing-scale changes even when the logical frame is unchanged.
+ self.publishedScene=nil;[self applyWeather];
 }
 - (void)applyWeather {
  if(!self.appeared)return;

@@ -12,7 +12,7 @@ cp Sources/Info.plist "$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set UIApplicationSceneManifest:UISceneConfigurations:UIWindowSceneSessionRoleApplication:0:UISceneDelegateClassName ModeTestScene' "$app/Contents/Info.plist"
 xcrun clang -fobjc-arc -target arm64-apple-ios17.0-macabi -isysroot "$sdk" \
  -iframework "$sdk/System/iOSSupport/System/Library/Frameworks" \
- -framework UIKit -framework Foundation -framework QuartzCore -framework ImageIO -framework CoreGraphics -framework MetalKit -framework Metal -framework WeatherKit -framework AVFoundation -framework CoreVideo -framework CoreMedia \
+ -framework UIKit -framework Foundation -framework QuartzCore -framework ImageIO -framework CoreGraphics -framework MetalKit -framework Metal -framework WeatherKit -framework AVFoundation -framework VideoToolbox -framework CoreVideo -framework CoreMedia \
  Tests/NativeWallpaper/modes.m Sources/NativeWallpaper/SceneExporter.m Build/WeatherRuntime.o Build/WeatherService.o Sources/SwiftCall.s -o "$app/Contents/MacOS/ModeTests"
 codesign --force --sign - "$app"
 log="$PWD/Build/test-native-modes.log"

@@ -18,6 +18,7 @@
 - (void)showPreferences;
 - (void)refreshSettings;
 - (void)settingsMessage:(NSString *)message;
+- (double)renderBackingScale;
 - (BOOL)menuBarVisible;
 - (void)setMenuBarVisible:(BOOL)visible;
 - (NSInteger)loginItemStatus;
@@ -133,7 +134,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  if(r[@"error"]){self.weatherView=previousView;self.scene=previousScene;self.effect=previousEffect;[self setStatus:r[@"error"]];return;}
  WWShootingStarLayer *meteor=[r[@"starOpacity"] doubleValue]>0 ? [WWShootingStarLayer layerForSize:self.view.bounds.size] : nil;
  // Change emitter geometry before makeView starts VFX's rendering thread.
- if(meteor)WWFitSkyToDisplay(self.scene,self.effect,self.view.bounds.size,YES);
+ WWFitSkyToDisplay(self.scene,self.effect,self.view.bounds.size,meteor!=nil);
  self.weatherView=[NSClassFromString(@"WeatherRuntime") makeView:self.effect];self.weatherView.frame=self.view.bounds;self.weatherView.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
  if(meteor){[self.weatherView.layer addSublayer:meteor];[meteor setPlaybackPaused:self.paused];}
  // Keep WeatherUI’s own output format and color handling.
@@ -144,7 +145,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  // offscreen, then swap views instead of changing storage under that graph.
  [previousView setRendersContinuously:NO];[previousScene stopRuntimeThread];[previousScene setIsPlaying:NO];
  [previousView setScene:nil];[previousView removeFromSuperview];
- [self.view insertSubview:self.weatherView atIndex:0];
+ [self.view insertSubview:self.weatherView atIndex:0];[self applyRenderingQuality];
  [self.view.layer insertSublayer:self.skyGradient atIndex:0];
  [self.scene setPaused:self.paused];[self.scene setIsPlaying:!self.paused];
  [self.weatherView setRendersContinuously:!self.paused];
@@ -195,6 +196,7 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
  if(self.liveWeather)[self displayCurrentWeather];
  if(!self.nextWeatherRefresh || [self.nextWeatherRefresh timeIntervalSinceNow]<=0)[self refreshWeather];
 }
+- (void)displayGeometryChanged {[self applyRenderingQuality];[self applyWeather];}
 - (void)refreshAfterWake {self.nextWeatherRefresh=nil;[self automaticTick];[self applyRenderingQuality];}
 - (void)refreshWeather {
  if(!self.location || self.requesting || !self.automaticWeather)return;
@@ -211,8 +213,13 @@ static double cloudCover(NSString *c) {if([c isEqual:@"clear"])return 0;if([c is
 - (void)applyRenderingQuality {
  BOOL high=[NSUserDefaults.standardUserDefaults objectForKey:@"HighQualityRendering"]==nil || [NSUserDefaults.standardUserDefaults boolForKey:@"HighQualityRendering"];
  NSInteger fps=(high && !NSProcessInfo.processInfo.lowPowerModeEnabled) ? 60 : 30;
- CGFloat scale=self.view.window.screen.scale ?: UIScreen.mainScreen.scale;
- self.weatherView.contentScaleFactor=scale;[self.weatherView setPreferredFramesPerSecond:fps];
+ CGFloat scale=self.desktopBridge ? [self.desktopBridge renderBackingScale] : (self.view.window.screen.scale ?: UIScreen.mainScreen.scale);
+ self.weatherView.contentScaleFactor=scale;
+ // VFX's legacy drawable multiplies its own scale by Catalyst's screen scale,
+ // which can remain Retina on a 1x external AppKit screen.
+ CGFloat catalystScale=self.view.window.screen.scale ?: UIScreen.mainScreen.scale;
+ if([self.weatherView respondsToSelector:@selector(setScaleFactor:)])[self.weatherView setScaleFactor:scale/MAX(1,catalystScale)];
+ [self.weatherView setPreferredFramesPerSecond:fps];
 }
 - (void)rebuildPreferences {[self.desktopBridge refreshSettings];}
 - (NSDictionary *)settingsState {

@@ -21,35 +21,58 @@ import CoreMedia
   guard let width=manifest["pixelWidth"] as? Int,let height=manifest["pixelHeight"] as? Int,
         let pointsW=manifest["renderWidth"] as? Double,let pointsH=manifest["renderHeight"] as? Double,
         let backing=manifest["renderScale"] as? Double else {fatalError("Missing pixel geometry")}
-  let scale=min(1,5120/max(pointsW*backing,pointsH*backing))
+  let scale=min(1,6144/max(pointsW*backing,pointsH*backing))
   let expectedW=Int(floor(pointsW*backing*scale/2))*2,expectedH=Int(floor(pointsH*backing*scale/2))*2
   guard width==expectedW,height==expectedH,poster.width==width,poster.height==height,
         Int(size.width)==width,Int(size.height)==height,
         descriptions.contains(where:{CMFormatDescriptionGetMediaSubType($0)==kCMVideoCodecType_HEVC})
         else {fatalError("Retina geometry, poster or codec mismatch")}
+  guard manifest["codec"] as? String == "hevc-main10", descriptions.contains(where: { description in
+   guard let atoms=CMFormatDescriptionGetExtension(description,extensionKey:kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms) as? [String:Data],let header=atoms["hvcC"],header.count>1 else {return false}
+   return header[1] & 31 == 2
+  }) else {fatalError("Export must contain an actual HEVC Main10 bitstream") }
+  let decoded=try await AVAssetImageGenerator(asset:asset).image(at:.zero).image
+  func thumbnail(_ image:CGImage)->[UInt8] {
+   var values=[UInt8](repeating:0,count:64*64*4)
+   values.withUnsafeMutableBytes { bytes in
+    let context=CGContext(data:bytes.baseAddress,width:64,height:64,bitsPerComponent:8,bytesPerRow:64*4,space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue|CGBitmapInfo.byteOrder32Big.rawValue)!
+    context.interpolationQuality = .high;context.draw(image,in:CGRect(x:0,y:0,width:64,height:64))
+   };return values
+  }
+  let originalColors=thumbnail(poster),movieColors=thumbnail(decoded)
+  var error=0.0
+  for index in originalColors.indices where index%4 != 3 {error += abs(Double(originalColors[index])-Double(movieColors[index]))}
+  let difference=error/Double(64*64*3)
+  guard difference<3 else {fatalError("Movie color/orientation diverges from poster: \(difference)")}
+  print("PASS: movie/poster color and orientation agree (mean error \(difference))")
+  if manifest["meteorOverlay"] as? Bool == true {
+   guard FileManager.default.fileExists(atPath:folder.appendingPathComponent("meteor.png").path) else {fatalError("Meteor texture missing")}
+  }
   print("PASS: physical display pixels preserved (\(width)x\(height)), matching PNG and HEVC movie")
   if ["clear","mostlyClear"].contains(manifest["condition"] as? String ?? ""),
      (manifest["elevation"] as? Double ?? 0)<(-10) {
    var pixels=[UInt8](repeating:0,count:width*height*4)
-   let contrast=pixels.withUnsafeMutableBytes { bytes -> (Double,Double) in
+   let contrast=pixels.withUnsafeMutableBytes { bytes -> (Double,Double,Double,Double) in
     let context=CGContext(data:bytes.baseAddress,width:width,height:height,bitsPerComponent:8,bytesPerRow:width*4,
       space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue|CGBitmapInfo.byteOrder32Big.rawValue)!
     context.draw(poster,in:CGRect(x:0,y:0,width:width,height:height))
     let data=bytes.bindMemory(to:UInt8.self)
     func luminance(_ x:Int,_ y:Int)->Double {let p=(y*width+x)*4;return (Double(data[p])+Double(data[p+1])+Double(data[p+2]))/3}
-    func stars(_ lower:Double,_ upper:Double)->Double {
+    func stars(_ lower:Double,_ upper:Double,_ left:Double=0.05,_ right:Double=0.45)->Double {
      var samples=[Double]()
      // The left side excludes the Moon; local contrast removes the sky gradient.
      for y in Int(Double(height)*lower)..<Int(Double(height)*upper) {
-      for x in max(8,width/20)..<min(width-8,width*45/100) {
+      for x in max(8,Int(Double(width)*left))..<min(width-8,Int(Double(width)*right)) {
        samples.append(luminance(x,y)-(luminance(x-8,y)+luminance(x+8,y))/2)
       }
      }
      samples.sort();return samples[Int(Double(samples.count-1)*0.999)]
     }
-    return (stars(0.05,0.30),stars(0.75,0.95))
+    return (stars(0.05,0.30),stars(0.75,0.95),stars(0.04,0.22,0.02,0.18),stars(0.04,0.22,0.82,0.98))
    }
    guard contrast.0>5,contrast.1<contrast.0*0.4 else {fatalError("Stars do not fade toward the bottom of the exported image")}
+   guard contrast.2>4,contrast.3>4 else {fatalError("Upper corners are missing stars")}
+   print("PASS: upper left/right corner stars visible")
    print("PASS: exported night stars fade toward the horizon, with correct mask orientation")
   }
  }

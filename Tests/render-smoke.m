@@ -45,6 +45,7 @@ int main(void) {@autoreleasepool {
   if(result[@"error"] || !result[@"starCount"] || !result[@"starOpacity"])return 8;
   if([result[@"starOpacity"] doubleValue]>[result[@"nativeStarOpacity"] doubleValue] || ![result[@"starSize"] isEqual:result[@"nativeStarSize"]])return 22;
   if(baseline)for(NSString *key in @[@"starCount",@"brightStarCount",@"starOpacity"])if(![baseline[key] isEqual:result[key]]){NSLog(@"FAILED repeated star update %@",key);return 9;}
+  if([result[@"brightStarCount"] integerValue]>[result[@"nativeBrightCount"] integerValue] || fabs([result[@"starTwinkleSpeed"] doubleValue]-1)>0.001 || fabs([result[@"starTwinkleAmount"] doubleValue]-0.75)>0.001 || fabs([result[@"starBrightTwinkleSpeed"] doubleValue]-0.5)>0.001 || fabs([result[@"starBrightTwinkleAmount"] doubleValue]-0.5)>0.001){NSLog(@"FAILED bounded bright-star population or native twinkle curves");return 23;}
   baseline=result;count++;
  }}
  NSDictionary *moon=[NSClassFromString(@"WeatherRuntime") applyEffect:effect condition:@"clear" elevation:-12 cloudCover:0 wind:8 size:CGSizeMake(1512,982) isPM:YES timeZone:@"America/Sao_Paulo" details:@{@"latitude":@(-20.18222),@"longitude":@(-49.35139),@"date":@1792360800}];

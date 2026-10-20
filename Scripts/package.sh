@@ -38,9 +38,11 @@ Mantenha o app aberto para atualizar o clima. A primeira preparação
 leva alguns segundos. A seleção anterior do papel de parede do sistema
 não é substituída automaticamente.
 
-Novidades 0.3.2: halo lunar reduzido preservando os detalhes da lua,
-estrelas mais discretas na parte inferior e captura Retina com HEVC.
-Mantém o movimento lunar atualizado e a estrela cadente em toda a largura.
+Novidades 0.3.5: brilho discreto da Lua e das estrelas, preservando a
+oclusão lunar e os tempos de cintilação. Estrela cadente com trajeto curto
+e animação independente do vídeo no modo de bloqueio. Melhor cobertura
+dos cantos, enquadramento em monitores externos e captura na escala
+física da tela. Vídeo HEVC Main10 com cores sRGB alinhadas ao poster.
 Inclui dois modos de animação, configurações compactas,
 botões Liquid Glass e preferência de modo salva.
 O loop nativo é experimental e pode apresentar uma emenda visível.
