@@ -179,30 +179,29 @@ static OSStatus restoreControls(EventHandlerCallRef next, EventRef event, void *
  [content.widthAnchor constraintEqualToAnchor:section.widthAnchor].active=YES;return section;
 }
 - (NSView *)settingsCard:(NSArray<NSView *> *)views {
- NSBox *card=[NSBox new];card.boxType=NSBoxCustom;card.titlePosition=NSNoTitle;card.cornerRadius=12;card.borderWidth=0.5;
- card.borderColor=[NSColor.separatorColor colorWithAlphaComponent:0.25];card.fillColor=NSColor.controlBackgroundColor;
- NSMutableArray<NSView *> *rows=[NSMutableArray new];
- for(NSView *view in views){
-  if(rows.count){NSBox *divider=[NSBox new];divider.boxType=NSBoxSeparator;[divider bind:NSHiddenBinding toObject:view withKeyPath:@"hidden" options:nil];[rows addObject:divider];}
-  [rows addObject:view];
- }
- NSStackView *stack=[NSStackView stackViewWithViews:rows];stack.orientation=NSUserInterfaceLayoutOrientationVertical;stack.alignment=NSLayoutAttributeLeading;stack.spacing=6;stack.translatesAutoresizingMaskIntoConstraints=NO;
- [card addSubview:stack];[NSLayoutConstraint activateConstraints:@[[stack.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:14],[stack.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-14],[stack.topAnchor constraintEqualToAnchor:card.topAnchor constant:8],[stack.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-8]]];
- for(NSView *view in rows)[view.widthAnchor constraintEqualToAnchor:stack.widthAnchor].active=YES;
- return card;
+ // Sections use whitespace, without opaque cards or enclosing borders.
+ NSStackView *stack=[NSStackView stackViewWithViews:views];
+ stack.orientation=NSUserInterfaceLayoutOrientationVertical;stack.alignment=NSLayoutAttributeLeading;
+ stack.spacing=10;stack.detachesHiddenViews=YES;
+ for(NSView *view in views)[view.widthAnchor constraintEqualToAnchor:stack.widthAnchor].active=YES;
+ return stack;
 }
 - (void)buildSettingsWindow {
  CGFloat available=NSScreen.mainScreen.visibleFrame.size.height;
- NSPanel *window=[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,580,MIN(720,available-70)) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
- window.title=@"Configurações";window.titlebarAppearsTransparent=YES;
+ NSPanel *window=[[NSPanel alloc] initWithContentRect:NSMakeRect(0,0,580,MIN(720,available-70)) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable|NSWindowStyleMaskFullSizeContentView backing:NSBackingStoreBuffered defer:NO];
+ window.title=@"Configurações";window.titlebarAppearsTransparent=YES;window.titleVisibility=NSWindowTitleHidden;
  window.releasedWhenClosed=NO;window.hidesOnDeactivate=NO;window.movableByWindowBackground=YES;
- window.contentMinSize=NSMakeSize(540,480);window.backgroundColor=NSColor.windowBackgroundColor;
+ window.contentMinSize=NSMakeSize(540,480);window.opaque=NO;window.backgroundColor=NSColor.clearColor;
+ NSVisualEffectView *material=[NSVisualEffectView new];material.material=NSVisualEffectMaterialHUDWindow;
+ material.blendingMode=NSVisualEffectBlendingModeBehindWindow;material.state=NSVisualEffectStateActive;
+ material.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;window.contentView=material;
  window.collectionBehavior=NSWindowCollectionBehaviorMoveToActiveSpace|NSWindowCollectionBehaviorFullScreenAuxiliary;
  NSScrollView *scroll=[NSScrollView new];scroll.hasVerticalScroller=YES;scroll.autohidesScrollers=YES;scroll.drawsBackground=NO;scroll.borderType=NSNoBorder;
- window.contentView=scroll;
+ scroll.translatesAutoresizingMaskIntoConstraints=NO;[material addSubview:scroll];
+ [NSLayoutConstraint activateConstraints:@[[scroll.leadingAnchor constraintEqualToAnchor:material.leadingAnchor],[scroll.trailingAnchor constraintEqualToAnchor:material.trailingAnchor],[scroll.topAnchor constraintEqualToAnchor:material.safeAreaLayoutGuide.topAnchor],[scroll.bottomAnchor constraintEqualToAnchor:material.bottomAnchor]]];
  WeatherSettingsDocument *document=[WeatherSettingsDocument new];document.translatesAutoresizingMaskIntoConstraints=NO;scroll.documentView=document;
  [NSLayoutConstraint activateConstraints:@[[document.leadingAnchor constraintEqualToAnchor:scroll.contentView.leadingAnchor],[document.trailingAnchor constraintEqualToAnchor:scroll.contentView.trailingAnchor],[document.topAnchor constraintEqualToAnchor:scroll.contentView.topAnchor],[document.widthAnchor constraintEqualToAnchor:scroll.contentView.widthAnchor]]];
- NSStackView *stack=[NSStackView new];stack.orientation=NSUserInterfaceLayoutOrientationVertical;stack.alignment=NSLayoutAttributeLeading;stack.spacing=12;stack.translatesAutoresizingMaskIntoConstraints=NO;[document addSubview:stack];
+ NSStackView *stack=[NSStackView new];stack.orientation=NSUserInterfaceLayoutOrientationVertical;stack.alignment=NSLayoutAttributeLeading;stack.spacing=18;stack.translatesAutoresizingMaskIntoConstraints=NO;[document addSubview:stack];
  [NSLayoutConstraint activateConstraints:@[[stack.leadingAnchor constraintEqualToAnchor:document.leadingAnchor constant:20],[stack.trailingAnchor constraintEqualToAnchor:document.trailingAnchor constant:-20],[stack.topAnchor constraintEqualToAnchor:document.topAnchor constant:16],[stack.bottomAnchor constraintEqualToAnchor:document.bottomAnchor constant:-16]]];
  void(^add)(NSView *)=^(NSView *view){[stack addArrangedSubview:view];[view.widthAnchor constraintEqualToAnchor:stack.widthAnchor].active=YES;};
  self.settingsCity=[self settingsLabel:@"" size:20 weight:NSFontWeightSemibold];

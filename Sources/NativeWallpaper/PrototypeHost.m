@@ -69,7 +69,10 @@
  if(!self.appeared)return;
  if(self.exporter.busy || self.preparingExport){self.exportPending=YES;return;}
  NSDictionary *metadata=[self sceneMetadata];
- if(!WWNeedsNewScene(self.publishedScene,metadata,self.publishedDate ? -self.publishedDate.timeIntervalSinceNow : INFINITY)){if(self.continuousWallpaperEnabled)[super applyWeather];return;}
+ // Keep the live simulation (and its random particle positions) running when
+ // only the clock/temperature changed. Rebuilding here caused a blink on every
+ // one-minute automatic tick, even though no new sky was needed.
+ if(!WWNeedsNewScene(self.publishedScene,metadata,self.publishedDate ? -self.publishedDate.timeIntervalSinceNow : INFINITY))return;
  self.paused=NO;[super applyWeather];
  if(!self.weatherView || !self.scene)return;
  // Match capture cadence; the exporter retains the drawable’s Retina pixels.

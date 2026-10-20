@@ -34,3 +34,5 @@ Run `Scripts/test-native-prototype.sh` for scene publication, weather update pol
 Clear night skies fade gently toward the horizon without fully removing corner stars. Lunar phase textures are derived locally at their original 400 × 400 resolution from the installed Weather assets, attenuating their halo. Desktop tuning reduces lunar surface brightness, bright-star count and bloom while preserving native twinkle timing. The spawn-shape adjustment keeps lunar occlusion in its native coordinate space. The app does not bundle or modify system textures.
 
 Display geometry, supported pixel sizes and the 0.3.3 rendering adjustments are documented in [Docs/Displays.md](../../Docs/Displays.md). The source Metal surface and poster are not HDR; Main10 avoids a further 8-bit decode stage in native video playback. The decorative nebula atlas is disabled to prevent broad color patches.
+
+Loop seams are dissolved over one second of movie time using the last displayed frame and incoming moving frames. The snapshot uses the same composited image, and pausing/deceleration preserves the transition state. Initial queue setup is not treated as a loop boundary.

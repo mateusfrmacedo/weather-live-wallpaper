@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import CoreImage
 
 func debugLog(_ message: String) { NSLog("%@", message) }
 func check(_ condition: @autoclosure () -> Bool, _ message: String) {
@@ -40,6 +41,27 @@ func run(for seconds: TimeInterval) { RunLoop.main.run(until: Date(timeIntervalS
             policy.update(mode: "locked", suspended: false, now: 7)
             check(policy.rate(at: 7) == 1, "wake resumes lock playback")
         }
+        // A seam starts at the exact outgoing image and converges to the new
+        // moving frame without a black/white intermediate frame. Paused movie
+        // time must preserve the blend rather than completing on wall time.
+        let context = CIContext(options: [.cacheIntermediates: false])
+        let extent = CGRect(x: 0,y: 0,width: 4,height: 4)
+        let red = CIImage(color: CIColor(red: 0.8,green: 0.1,blue: 0.1)).cropped(to: extent)
+        let blue = CIImage(color: CIColor(red: 0.1,green: 0.1,blue: 0.8)).cropped(to: extent)
+        let outgoing = context.createCGImage(red, from: extent)!
+        func pixel(_ image: CIImage) -> [UInt8] {
+            var bytes = [UInt8](repeating: 0,count: 4)
+            context.render(image, toBitmap: &bytes, rowBytes: 4, bounds: CGRect(x: 0,y: 0,width: 1,height: 1), format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+            return bytes
+        }
+        var blend = WallpaperLoopBlend()
+        blend.begin(from: outgoing, at: 0)
+        let first = pixel(blend.composite(blue, at: 0))
+        check(first == pixel(CIImage(cgImage: outgoing)), "loop seam preserves the exact last frame")
+        let middle = pixel(blend.composite(blue, at: 0.5))
+        check(middle[0] > 40 && middle[2] > 40 && middle[1] < 50 && middle[3] == 255, "loop midpoint blends both frames without a brightness flash")
+        check(middle == pixel(blend.composite(blue, at: 0.5)), "paused media time preserves the seam image")
+        check(pixel(blend.composite(blue, at: 1)) == pixel(blue) && !blend.isActive, "loop blend completes and releases the outgoing frame")
         // Apple laptop/desktop panels and the user's QHD external monitor.
         let displays: [CGSize] = [CGSize(width: 2560,height: 1664),CGSize(width: 2880,height: 1864),CGSize(width: 3024,height: 1964),CGSize(width: 3456,height: 2234),CGSize(width: 4480,height: 2520),CGSize(width: 5120,height: 2880),CGSize(width: 6016,height: 3384),CGSize(width: 2560,height: 1440)]
         for display in displays {
@@ -86,7 +108,10 @@ func run(for seconds: TimeInterval) { RunLoop.main.run(until: Date(timeIntervalS
             check(session.renderedFrameCount == 0, "static desktop does no frame decoding")
             session.update(mode: "locked", suspended: false)
             run(for: 2)
+            check(session.loopTransitionCount == 0, "initial looper replica is not treated as a loop seam")
+            run(for: 17)
             check(session.renderedFrameCount > 5, "lock renders actual video frames")
+            check(session.loopTransitionCount >= 1 && session.loopBlendFrameCount > 2, "real movie loop blends across the item boundary")
             check(session.image?.bitsPerComponent == 16, "movie decoding retains precision for dark gradients")
             check(meteor == nil || meteor?.speed == 1,"meteor animates independently of weather movie timestamps")
             let meteorStart = meteor?.sublayers?.first?.animation(forKey: "meteor")?.beginTime

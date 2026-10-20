@@ -20,7 +20,13 @@ static void require(BOOL result,NSString *message){if(!result){NSLog(@"FAIL: %@"
    require(self.wallpaper==continuous && [[self.desktopBridge valueForKey:@"wallpaper"] boolValue]==continuous,@"desktop window mode");
    require(self.paused!=continuous && [self.scene isPlaying]==continuous,@"renderer starts and stops");
    require([[[self.desktopBridge valueForKey:@"qualityCard"] valueForKey:@"hidden"] boolValue]!=continuous,@"quality visibility");
-   if(continuous){[self togglePause];require(![self.scene isPlaying],@"pause animation");[self togglePause];require([self.scene isPlaying],@"resume animation");}
+   if(continuous){
+    self.publishedScene=[self sceneMetadata];self.publishedDate=NSDate.date;
+    UIView *runningView=self.weatherView;id runningScene=self.scene;
+    WWShootingStarLayer *runningMeteor=WWShootingStarForView(runningView);
+    [self applyWeather];[self applyWeather];
+    require(self.weatherView==runningView && self.scene==runningScene && WWShootingStarForView(self.weatherView)==runningMeteor,@"unchanged weather refresh preserves the running simulation and meteor clock");
+    [self togglePause];require(![self.scene isPlaying],@"pause animation");[self togglePause];require([self.scene isPlaying],@"resume animation");}
    else require(![[[self.desktopBridge valueForKey:@"window"] valueForKey:@"visible"] boolValue],@"economic render window hidden");
   }
   require([[[self.desktopBridge valueForKey:@"settingsWindow"] valueForKey:@"visible"] boolValue],@"settings remain visible");

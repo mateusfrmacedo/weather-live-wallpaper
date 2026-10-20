@@ -25,6 +25,12 @@ final class WeatherWallpaperSession {
     private(set) var renderedFrameCount = 0
     private var meteor: WallpaperMeteor?
     private var playbackObserver: NSKeyValueObservation?
+    private var outputItem: AVPlayerItem?
+    private var loopTransitionPending = false
+    private var hasDecodedCurrentMovie = false
+    private var loopBlend = WallpaperLoopBlend()
+    private(set) var loopTransitionCount = 0
+    private(set) var loopBlendFrameCount = 0
 
     init?(size: CGSize, scale: CGFloat, displayID: UInt32?) {
         var options: [String: Any] = ["contentsScale": scale]
@@ -96,6 +102,7 @@ final class WeatherWallpaperSession {
         meteor = WallpaperMeteor(directory: directory, metadata: manifest)
         if let meteor { root.addSublayer(meteor.layer); meteor.resize(root.bounds.size); meteor.setRate(policy.rate(at: ProcessInfo.processInfo.systemUptime)) }
         player?.pause(); player = nil; looper = nil; output = nil; playbackObserver = nil
+        outputItem = nil; loopTransitionPending = false; hasDecodedCurrentMovie = false; loopBlend.reset()
         movieURL = movie
         setImage(poster, crossfade: image != nil)
         // A weather update must never restart desktop animation.
@@ -113,6 +120,9 @@ final class WeatherWallpaperSession {
         playbackObserver = player.observe(\.currentItem, options: [.initial, .new]) { [weak self] player, _ in
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.player === player, let current = player.currentItem else { return }
+                guard self.outputItem !== current else { return }
+                if self.hasDecodedCurrentMovie && self.outputItem != nil { self.loopTransitionPending = true }
+                self.outputItem = current
                 let output = AVPlayerItemVideoOutput(pixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange])
                 current.add(output); self.output = output
             }
@@ -137,8 +147,17 @@ final class WeatherWallpaperSession {
         guard let output else { return }
         let time = output.itemTime(forHostTime: CACurrentMediaTime())
         guard output.hasNewPixelBuffer(forItemTime: time), let buffer = output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil) else { return }
-        let ci = CIImage(cvPixelBuffer: buffer)
+        let incoming = CIImage(cvPixelBuffer: buffer)
+        let mediaTime = CMTimeGetSeconds(time)
+        if loopTransitionPending, let image, mediaTime.isFinite {
+            loopBlend.begin(from: image, at: mediaTime)
+            loopTransitionPending = false; loopTransitionCount += 1
+            debugLog("Blending loop boundary \(loopTransitionCount)")
+        }
+        let ci = loopBlend.composite(incoming, at: mediaTime)
+        if loopBlend.isActive { loopBlendFrameCount += 1 }
         guard let frame = ciContext.createCGImage(ci, from: ci.extent, format: .RGBA16, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else { return }
+        hasDecodedCurrentMovie = true
         renderedFrameCount += 1
         if renderedFrameCount == 1 { debugLog("First animated frame decoded") }
         setImage(frame, crossfade: false)
@@ -157,7 +176,30 @@ final class WeatherWallpaperSession {
     }
     func stop() {
         player?.pause(); player = nil; looper = nil; output = nil
-        playbackObserver = nil; meteor?.layer.removeFromSuperlayer(); meteor = nil; stopTimer(); context.layer = nil
+        playbackObserver = nil; outputItem = nil; loopTransitionPending = false; hasDecodedCurrentMovie = false; loopBlend.reset(); meteor?.layer.removeFromSuperlayer(); meteor = nil; stopTimer(); context.layer = nil
     }
     deinit { displayTimer?.invalidate() }
+}
+
+// Blend only the loop seam. Movie time drives the fade, so unlock deceleration
+// and sleep pause the transition along with the video. The composited frame is
+// also the snapshot: switching to a still desktop cannot reveal a raw frame.
+struct WallpaperLoopBlend {
+    let duration: Double = 1
+    private var outgoing: CIImage?
+    private var start: Double = 0
+    var isActive: Bool { outgoing != nil }
+    mutating func begin(from image: CGImage, at mediaTime: Double) {
+        outgoing = CIImage(cgImage: image); start = mediaTime
+    }
+    mutating func reset() { outgoing = nil }
+    mutating func composite(_ incoming: CIImage, at mediaTime: Double) -> CIImage {
+        guard let outgoing else { return incoming }
+        guard mediaTime.isFinite else { return outgoing }
+        let progress = max(0, min(1, (mediaTime - start) / duration))
+        if progress >= 1 { reset(); return incoming }
+        if progress == 0 { return outgoing }
+        let eased = progress * progress * (3 - 2 * progress)
+        return outgoing.applyingFilter("CIDissolveTransition", parameters: [kCIInputTargetImageKey: incoming, kCIInputTimeKey: eased]).cropped(to: incoming.extent)
+    }
 }

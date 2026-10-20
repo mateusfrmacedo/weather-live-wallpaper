@@ -38,15 +38,13 @@ Mantenha o app aberto para atualizar o clima. A primeira preparação
 leva alguns segundos. A seleção anterior do papel de parede do sistema
 não é substituída automaticamente.
 
-Novidades 0.3.7: ícone noturno com Lua à direita e nuvem sobre fundo
-azul-escuro. Estrela cadente baseada nos parâmetros do Tempo: passagem
-de aproximadamente meio segundo, intervalos variáveis de 11–15 segundos
-e rastro que cresce e se desfaz, animado separadamente do vídeo.
-Mantém o brilho discreto da Lua e das estrelas e os ajustes para monitores
-externos, com vídeo HEVC Main10 e cores sRGB alinhadas ao poster.
-Inclui dois modos de animação, configurações compactas,
-botões Liquid Glass e preferência de modo salva.
-O loop nativo é experimental e pode apresentar uma emenda visível.
+Novidades 0.3.9: configurações com fundo translúcido fosco e grupos
+sem caixas, preservando todas as opções. Transição suave de um segundo
+na emenda do vídeo. Atualizações sem mudança visual mantêm a simulação
+em execução no modo Sempre animado, evitando reinícios a cada minuto.
+Mantém o ícone noturno com Lua à direita, a estrela cadente baseada nos
+parâmetros do Tempo e o brilho discreto da Lua e das estrelas.
+Inclui os dois modos de animação e os ajustes para monitores externos.
 Atalho para recuperar os controles: Command + Shift + P.
 
 Código-fonte, documentação e novas versões:
